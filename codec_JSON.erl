@@ -10,8 +10,6 @@
 
 -export( [ test/0 ] ).
 
--include_lib("spy/include/spy.hrl").
-
 -define(backspace,$\b). %  8
 -define(tab,$\t).       %  9
 -define(newline,$\n).   % 10

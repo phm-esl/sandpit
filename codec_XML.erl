@@ -9,7 +9,10 @@
   , decode/3
   , load_config/1 ] ).
 
--include_lib("spy/include/spy.hrl").
+-define(dbg(F,A), io:format(
+"Location: ~p.erl:~p~n"
+"Function: ~p/~p~n" F,
+[?MODULE,?LINE,?FUNCTION_NAME,?FUNCTION_ARITY|A])).
 
 -type data_path()
       :: atom().
@@ -879,7 +882,6 @@ nested_nodes(In) ->
 nested_nodes([],Out) -> lists:reverse(Out);
 nested_nodes([{end_node,End}|In],Out) -> {end_node,End,lists:reverse(Out),In};
 nested_nodes([{start_node,Start}|In],Out) ->
-  ?pdict_trace(Start),
   case nested_nodes(In)
     of {end_node,Tag,[<<>>],Rest}
        -> Content = nested_node_contents(Start,[],Tag)
@@ -901,7 +903,6 @@ nested_nodes([Each|In],Out) ->
   nested_nodes(In,[Each|Out]).
 
 nested_node_contents(Start,Content,Tag) ->
-  ?pdict_trace(Tag),
   Size = byte_size(Tag),
   case Start
     of Tag -> Content

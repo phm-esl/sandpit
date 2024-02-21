@@ -1,5 +1,9 @@
 -module(codec_JSON).
 
+% Suppress compiler warning in case of both
+% ATOMIC_NAMES and ATOMIC_VALUES are undefiend:
+-compile([{nowarn_unused_function,atomic/1}]).
+
 %%%
 %%%  https://www.rfc-editor.org/rfc/rfc8259.txt
 %%%
@@ -37,9 +41,17 @@
 -define(FALSE_BINARY,<< ?FALSE_STRING >>).
 -define(NULL_BINARY,<< ?NULL_STRING >>).
 
+-define(ATOMIC_NAMES,1).
+% When ATOMIC_NAMES is defined, use existing atoms
+% as object field namess to replace decoded binary values.
+
 -define(ATOMIC_VALUES,1).
 % When ATOMIC_VALUES is defined, use existing atoms
 % as values to replace decoded binary values.
+
+-define(ESCAPED_STRINGS,1).
+% When ESCAPED_STRINGS is defined, the escape sequences such as \uXXXX for
+% Unicode and other back-slash sequences are converted.
 
 -type json_value()
       :: tuple() % array
@@ -94,10 +106,15 @@ encode_object(In) ->
 encode_object(Key,Val,Out) ->
   [ ?comma, encode_string(Key), ?colon, encode(Val) | Out ].
 
-encode_string(Bin) when is_binary(Bin) ->
-  encode_string(binary_to_list(Bin));
-encode_string(In) when is_list(In) ->
-  unicode:characters_to_binary([ ?quote, escape_string(In), ?quote ]).
+-ifdef(ESCAPED_STRINGS).
+
+encode_string(In) ->
+  case In
+    of Atom when is_atom(Atom) -> encode_string(erlang:atom_to_list(Atom))
+     ; Binary when is_binary(Binary) -> encode_string(binary_to_list(Binary))
+     ; List when is_list(List)
+       -> Unicode = unicode:characters_to_binary(escape_string(List))
+        , [ ?quote, Unicode, ?quote ] end.
 
 escape_string([]) -> [];
 escape_string([In|Rest]) ->
@@ -116,6 +133,20 @@ escape_string([In|Rest]) ->
 
 hex(N) when 0 =< N, N < 10 -> N + $0;
 hex(N) when 10 =< N, N < 16 -> N - 10 + $a.
+
+-else.
+
+encode_string(In) ->
+  case In
+    of Atom when is_atom(Atom)
+       -> [ ?quote, erlang:atom_to_list(Atom), ?quote ]
+     ; Binary when is_binary(Binary)
+       -> [ ?quote, Binary, ?quote ]
+     ; List when is_list(List)
+       -> Unicode = unicode:characters_to_binary(List)
+        , [ ?quote, Unicode, ?quote ] end.
+
+-endif.
 
 decode(Binary) ->
   case decode(0,Binary)
@@ -151,6 +182,8 @@ decode_string(Pos,Len,Binary) ->
      ; << Char >> when ?space =< Char
        -> decode_string(Pos,Len + 1,Binary) end.
 
+-ifdef(ESCAPED_STRINGS).
+
 restore_string(Binary) when is_binary(Binary) ->
   case binary:split(Binary,<< ?backslash >>,[global])
     of [Out] -> Out
@@ -178,6 +211,12 @@ restore_part([In|Rest]) ->
 int4(X) when $0 =< X, X =< $9 -> X - $0;
 int4(X) when $A =< X, X =< $F -> 10 + X - $A;
 int4(X) when $a =< X, X =< $f -> 10 + X - $a.
+
+-else.
+
+restore_string(Binary) -> Binary.
+
+-endif.
 
 decode_array(Pos,Binary) ->
   decode_array(Pos,Binary,[]).
@@ -220,7 +259,11 @@ decode_object(Pos,Binary,Out) ->
                   ; is_number(Value)
                -> decode_object(Done,Binary,Out#{ Name => Value }) end end.
 
+-ifdef(ATOMIC_NAMES).
 atomic_name(Name) when is_binary(Name) -> atomic(Name).
+-else.
+atomic_name(Name) -> Name.
+-endif.
 
 -ifdef(ATOMIC_VALUES).
 atomic_value(Value) when is_binary(Value), size(Value) > 0 -> atomic(Value);

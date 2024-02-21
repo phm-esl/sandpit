@@ -1,7 +1,7 @@
 -module(codec_JSON).
 
 % Suppress compiler warning in case of both
-% ATOMIC_NAMES and ATOMIC_VALUES are undefiend:
+% ATOMIC_NAMES and ATOMIC_VALUES are undefined:
 -compile([{nowarn_unused_function,atomic/1}]).
 
 %%%
@@ -139,7 +139,7 @@ hex(N) when 10 =< N, N < 16 -> N - 10 + $a.
 encode_string(In) ->
   case In
     of Atom when is_atom(Atom)
-       -> [ ?quote, erlang:atom_to_list(Atom), ?quote ]
+       -> [ ?quote, erlang:atom_to_binary(Atom), ?quote ]
      ; Binary when is_binary(Binary)
        -> [ ?quote, Binary, ?quote ]
      ; List when is_list(List)

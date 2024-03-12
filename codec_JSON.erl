@@ -395,16 +395,20 @@ safe(Fn,Test) ->
 
 test_fragments() ->
   Tests = test_compound(),
-  lists:filter(fun (T) -> test_frag(T,1) end, Tests).
+  lists:filter(fun (T) -> test_frag(T) end, Tests).
+
+test_frag(Test) -> not test_frag(Test,1).
 
 test_frag({Good,Bin}=Test,Pos) ->
   case Bin of
     << _:Pos/binary >> -> true;
     << Head:Pos/binary, Tail/binary >> ->
       Fn = decode(Head),
-      is_function(Fn,2)
-        andalso Good =:= Fn(Tail)
-        andalso test_frag(Test,Pos + 1) end.
+      Pass = is_function(Fn) andalso Good =:= Fn(Tail),
+      if Pass -> test_frag(Test,Pos + 1);
+         true ->
+           io:format("Tail = ~p.~n",[Tail]),
+           false end end.
 
 
 test_encode(Tail) ->
@@ -517,4 +521,4 @@ test_compound() ->
               " , \"float\" : 1.23456789000000003637e+23 "
               " , \"12\" : [ true , false , null ] } "
              " , \"More data...\" "
-             " , 999999 ] "/utf8 >> } ].
+             " , 999999 ]"/utf8 >> } ].

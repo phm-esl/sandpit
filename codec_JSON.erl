@@ -404,11 +404,10 @@ test_frag({Good,Bin}=Test,Pos) ->
     << _:Pos/binary >> -> true;
     << Head:Pos/binary, Tail/binary >> ->
       Fn = decode(Head),
-      Pass = is_function(Fn) andalso Good =:= Fn(Tail),
+      Pass = is_function(Fn) andalso Good =:= Fn(Tail) orelse Good =:= Fn,
       if Pass -> test_frag(Test,Pos + 1);
-         true ->
-           io:format("Tail = ~p.~n",[Tail]),
-           false end end.
+         not is_function(Fn) -> io:format("Fn = ~p.~n",[Fn]), false;
+         true -> io:format("Tail = ~p.~n",[Tail]), false end end.
 
 
 test_encode(Tail) ->
@@ -521,4 +520,4 @@ test_compound() ->
               " , \"float\" : 1.23456789000000003637e+23 "
               " , \"12\" : [ true , false , null ] } "
              " , \"More data...\" "
-             " , 999999 ]"/utf8 >> } ].
+             " , 999999 ]    "/utf8 >> } ].

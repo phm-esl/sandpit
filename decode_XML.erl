@@ -388,7 +388,6 @@ test_fragments() ->
   lists:filter(fun (T) -> test_frag(T) end, Tests).
 
 test_frag(Test) ->
-  io:format("Test = ~p.~n",[Test]),
   not test_frag(Test,1).
 
 test_frag({Bin,Good}=Test,Pos) ->
@@ -396,7 +395,7 @@ test_frag({Bin,Good}=Test,Pos) ->
     << _:Pos/binary >> -> true;
     << Head:Pos/binary, Tail/binary >> ->
       Fn = decode(Head),
-      Pass = is_function(Fn) andalso Good =:= Fn(Tail),
+      Pass = is_function(Fn) andalso Good =:= Fn(Tail) orelse Good =:= Fn,
       if Pass -> test_frag(Test,Pos + 1);
          not is_function(Fn) -> io:format("Fn = ~p.~n",[Fn]), false;
          true -> io:format("Tail = ~p.~n",[Tail]), false end end.

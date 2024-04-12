@@ -1,7 +1,6 @@
 -module(codec_JSON).
 
-% Suppress compiler warning in case of both
-% ATOMIC_NAMES and ATOMIC_VALUES are undefined:
+% Suppress compiler warning in case ATOMIC_VALUES is undefined:
 -compile([{nowarn_unused_function,atomic/1}]).
 
 %%%
@@ -10,6 +9,7 @@
 
 -export(
   [ encode/1
+  , encode/2
   , decode/1
   , test/0
   , test_fragments/0 ]).
@@ -41,10 +41,6 @@
 -define(FALSE_BINARY,<< ?FALSE_STRING >>).
 -define(NULL_BINARY,<< ?NULL_STRING >>).
 
--define(ATOMIC_NAMES,1).
-% When ATOMIC_NAMES is defined, use existing atoms
-% as object field namess to replace decoded binary values.
-
 -define(ATOMIC_VALUES,1).
 % When ATOMIC_VALUES is defined, use existing atoms
 % as values to replace decoded binary values.
@@ -53,56 +49,89 @@
 % When ESCAPED_STRINGS is defined, the escape sequences such as \uXXXX for
 % Unicode and other back-slash sequences are converted.
 
-encode(In) ->
-to_binary(
+encode(In) -> encode(In,# {}).
+
+encode(In,Opt) ->
+  Done = fun (O) -> O end,
+  case Opt of
+    #{ atomic_names := true } -> encode_atomic_names(encode(In,<< >>,Done));
+    #{ } -> encode(In,<< >>,Done) end.
+
+% Capture the returned {atom(),function()} to insert the Atom
+% text into the encoded result.  Otherwise, the Atom represents
+% a place-holder where an alternative value is inserted, that
+% is passed as the parameter to the returned function Next.
+encode_atomic_names({Atom,Next}) when is_atom(Atom) ->
+  encode_atomic_names(Next(erlang:atom_to_binary(Atom)));
+encode_atomic_names(Bin) when is_binary(Bin) ->
+  Bin.
+
+
+encode(In,Out,Done) ->
   case In of
-     Array when     is_tuple(Array) ->       encode_array(In);
-    Object when      is_map(Object) ->      encode_object(In);
-    String when     is_list(String) ->      encode_string(In);
-    String when   is_binary(String) ->      encode_string(In);
-   Integer when is_integer(Integer) ->  integer_to_binary(In);
-     Float when     is_float(Float) ->    float_to_binary(In);
-   Literal when    is_atom(Literal) ->     encode_literal(In) end ).
+   'true' -> Done(<< Out/binary,  ?TRUE_STRING >>);
+  'false' -> Done(<< Out/binary, ?FALSE_STRING >>);
+   'null' -> Done(<< Out/binary,  ?NULL_STRING >>);
+     Array when     is_tuple(Array) ->  encode_array(In,Out,Done);
+    Object when      is_map(Object) -> encode_object(In,Out,Done);
+    String when     is_list(String) -> encode_string(In,Out,Done);
+    String when   is_binary(String) -> encode_string(In,Out,Done);
+   Integer when is_integer(Integer) ->
+           Bin = integer_to_binary(In),
+           Done(<< Out/binary, Bin/binary >>);
+     Float when is_float(Float) ->
+           Bin = float_to_binary(In),
+           Done(<< Out/binary, Bin/binary >>);
+    _ -> {In,fun (I) -> encode(I,Out,Done) end} end.
 
-to_binary(List) when is_list(List) ->  erlang:list_to_binary(List);
-to_binary(Binary) when is_binary(Binary) -> Binary.
 
-encode_literal(true) -> ?TRUE_BINARY;
-encode_literal(false) -> ?FALSE_BINARY;
-encode_literal(null) -> ?NULL_BINARY;
-encode_literal(Atom) when is_atom(Atom) -> encode_string(Atom).
+encode_array({},Out,Done) ->
+  Done(<< Out/binary, ?open_square, ?close_square >>);
+encode_array(In,Out,Done) ->
+  encode_array_element(In,1,<< Out/binary, ?open_square >>,Done).
 
-
-encode_array(In) ->
-  encode_array(tuple_size(In),In,[ ?close_square ]).
-
-encode_array(N,In,Out) when 0 < N ->
+encode_array_element(In,N,Out,Done) when N =< tuple_size(In) ->
   Val = element(N,In),
-  encode_array(N - 1, In, [ ?comma , encode(Val) | Out ]);
-encode_array(0,_,Out) ->
-  case Out of
-    [ ?comma | Array ] -> [ ?open_square | Array ];
-    [ ?close_square ] -> [ ?open_square, ?close_square ] end. % empty array.
+  Next = fun (O) -> encode_array_punct(In,N,O,Done) end,
+  encode(Val,Out,Next).
+
+encode_array_punct(In,N,Out,Done) ->
+  if N < tuple_size(In) ->
+       encode_array_element(In,N + 1,<< Out/binary, ?comma >>,Done);
+     N =:= tuple_size(In) ->
+       Done(<< Out/binary, ?close_square >>) end.
 
 
-encode_object(In) ->
-  case maps:fold(fun encode_object/3,[ ?close_brace ],In) of
-    [ ?comma | Object ] -> [ ?open_brace | Object ];
-    [ ?close_brace ] -> [ ?open_brace, ?close_brace ] end. % empty object.
+encode_object(In,Out,Done) ->
+  case maps:next(maps:iterator(In,reversed)) of % due to test data only!
+    none -> << ?open_brace, ?close_brace >>;
+    Iter -> encode_object_key(Iter,0,Out,Done) end.
 
-encode_object(Key,Val,Out) ->
-  [ ?comma, encode_string(Key), ?colon, encode(Val) | Out ].
+encode_object_key(none,N,Out,Done) ->
+  if N =:= 0 -> Done(<< Out/binary, ?open_brace, ?close_brace >>);
+     N > 0 -> Done(<< Out/binary, ?close_brace >>) end;
+encode_object_key({Key,Val,Iter},N,Out,Done) ->
+  Next = fun (O) ->
+    encode_object_value(Val,Iter,N + 1,<< O/binary, ?colon >>,Done) end,
+  if N == 0 -> encode_string(Key,<< Out/binary, ?open_brace >>, Next);
+     N > 0 -> encode_string(Key,<< Out/binary, ?comma >>,Next) end.
+
+encode_object_value(Val,Iter,N,Out,Done) ->
+  Next = fun (O) -> encode_object_key(maps:next(Iter),N,O,Done) end,
+  encode(Val,Out,Next).
 
 
 -ifdef(ESCAPED_STRINGS).
 
-encode_string(In) ->
-  case In
-    of Atom when is_atom(Atom) -> encode_string(erlang:atom_to_list(Atom))
-     ; Binary when is_binary(Binary) -> encode_string(binary_to_list(Binary))
-     ; List when is_list(List)
-       -> Unicode = unicode:characters_to_binary(escape_string(List))
-        , [ ?quote, Unicode, ?quote ] end.
+encode_string(In,Out,Done) ->
+  case In of
+    Atom when is_atom(Atom) ->
+      {In,fun (I) -> encode_string(I,Out,Done) end};
+    Binary when is_binary(Binary) ->
+      encode_string(binary_to_list(Binary),Out,Done);
+    List when is_list(List) ->
+      Unicode = unicode:characters_to_binary(escape_string(List)),
+      Done(<< Out/binary, ?quote, Unicode/binary, ?quote >>) end.
 
 escape_string([]) -> [];
 escape_string([In|Rest]) ->
@@ -124,15 +153,13 @@ hex(N) when 10 =< N, N < 16 -> N - 10 + $a.
 
 -else.
 
-encode_string(In) ->
-  case In
-    of Atom when is_atom(Atom)
-       -> [ ?quote, erlang:atom_to_binary(Atom), ?quote ]
-     ; Binary when is_binary(Binary)
-       -> [ ?quote, Binary, ?quote ]
-     ; List when is_list(List)
-       -> Unicode = unicode:characters_to_binary(List)
-        , [ ?quote, Unicode, ?quote ] end.
+encode_string(In,Out,Done) ->
+  case In of
+    Binary when is_binary(Binary) ->
+      Done(<< Out/binary, ?quote, Binary, ?quote >>);
+    List when is_list(List) ->
+      Unicode = unicode:characters_to_binary(List),
+      Done(<< Out/binary, ?quote, Unicode, ?quote >>) end.
 
 -endif.
 
@@ -411,7 +438,7 @@ test_frag({Good,Bin}=Test,Pos) ->
 
 
 test_encode(Tail) ->
-   { fun encode/1
+   { fun (X) -> encode(X,#{atomic_names => true}) end
    , [ {<< $",$" >>,""}
      , {<< "[]" >>,{}}
      , {<< "{}" >>,#{}}

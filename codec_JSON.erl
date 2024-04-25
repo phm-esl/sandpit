@@ -55,16 +55,39 @@ encode(In,Opt) ->
   Done = fun (O) -> O end,
   case Opt of
     #{ atomic_names := true } -> encode_atomic_names(encode(In,<< >>,Done));
+    #{ substitute_map := Subs } when is_map(Subs) ->
+      % The [] key for the limit value is not an atom() on purpose (-:
+      Limit = maps:get(looplimit,Opt,1000),
+      encode_substitutions(Subs#{ [] => Limit },encode(In,<< >>,Done));
     #{ } -> encode(In,<< >>,Done) end.
 
 % Capture the returned {atom(),function()} to insert the Atom
-% text into the encoded result.  Otherwise, the Atom represents
-% a place-holder where an alternative value is inserted, that
-% is passed as the parameter to the returned function Next.
+% text into the encoded result.
 encode_atomic_names({Atom,Next}) when is_atom(Atom) ->
   encode_atomic_names(Next(erlang:atom_to_binary(Atom)));
 encode_atomic_names(Bin) when is_binary(Bin) ->
   Bin.
+
+% Capture the returned {atom(),function()} to Insert the
+% substitute into the encoded result.  The Atom represents a
+% place-holder where an alternative value is inserted, that is
+% passed as the parameter to the returned function Next.  If no
+% substitute is given, pass control back to the caller.  Note
+% that if the Insert term also contains atom() tokens, these
+% will also be substrituted.  To avoid infinite loops, there is
+% a Limit counter.
+encode_substitutions(Subs,{Atom,Next}) when is_atom(Atom) ->
+  case Subs of
+    #{ Atom := Insert, [] := Limit } when Limit > 0 ->
+      Decr =  Subs#{ [] := Limit - 1 },
+      encode_substitutions(Decr,Next(Insert));
+    #{ [] := Limit } when Limit > 0 ->
+      Decr = Subs#{ [] := Limit - 1 },
+      Cont = fun(Insert) -> encode_substitutions(Decr,Next(Insert)) end,
+      {Atom,Cont};
+    #{ [] := 0 } -> throw(looplimit) end;
+encode_substitutions(_,Binary) when is_binary(Binary) ->
+  Binary.
 
 
 encode(In,Out,Done) ->

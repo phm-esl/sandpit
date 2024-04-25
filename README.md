@@ -53,3 +53,40 @@ Display the encoded binary in more friendly fashion:
     [1,[11,22,33],[3,4,{"b":{"dd":55,"cc":44},"a":"END"}]]
     ok
 
+The above substitution values can be provided to the enoder as a map:
+
+    6> codec_JSON:encode(
+         {1,c,{3,4,#{"a" => a, "b" => b}}},
+         #{ substitute_map =>
+            #{ a => "END",
+               b => #{"cc" => 44, "dd" => 55},
+               c => {11,22,33} } } ).
+    <<"[1,[11,22,33],[3,4,{\"b\":{\"dd\":55,\"cc\":44},\"a\":\"END\"}]]">>
+
+The substitutions are recursive: If the substitute also contains atoms,
+these will either be fetched from the `substitute_map`, or control is passed
+back to the caller to decide.
+
+    7> codec_JSON:encode(
+         {1,c,{3,4,#{"a" => a, "b" => b}}},
+         #{ substitute_map =>
+            #{ a => "END",
+               b => #{"cc" => cc, "dd" => dd}, % contains atoms
+               c => {11,22,33},
+               cc => 4444,
+               dd => 5555 } } ).
+    <<"[1,[11,22,33],[3,4,{\"b\":{\"dd\":5555,\"cc\":4444},\"a\":\"END\"}]]">>
+
+Recursion depth is limited by default to 1000. The limit value can be
+specified as an option:
+
+    8> codec_JSON:encode(
+         {1,c,{3,4,#{"a" => a, "b" => b}}},
+         #{ looplimit => 123,
+            substitute_map =>
+            #{ a => a,
+               b => b,
+               c => c } } ).
+    ** exception throw: looplimit
+         in function  codec_JSON:encode_substitutions/2 (codec_JSON.erl, line 88)
+

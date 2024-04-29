@@ -87,11 +87,20 @@
 
 [27]   Misc   ::=   Comment | PI | S 
 
-[28]   doctypedecl   ::=   '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
+[28]   doctypedecl
+       ::= '<!DOCTYPE' S Name (S ExternalID)? S? ('[' intSubset ']' S?)? '>'
 [28a]  DeclSep   ::=   PEReference | S
 [28b]  intSubset   ::=   (markupdecl | DeclSep)*
-[29]   markupdecl   ::=   elementdecl | AttlistDecl | EntityDecl | NotationDecl | PI | Comment 
+[29]   markupdecl
+       ::=   elementdecl
+         | AttlistDecl
+         | EntityDecl
+         | NotationDecl
+         | PI
+         | Comment
 
+/* The extSubset rule is mentioned in the text 4.2.2 External Entities,
+   but is not referenced in other rules */
 [30]   extSubset   ::=   TextDecl? extSubsetDecl
 [31]   extSubsetDecl   ::=   ( markupdecl | conditionalSect | DeclSep)*
 
@@ -106,7 +115,12 @@
 
 [42]   ETag   ::=   '</' Name S? '>'
 
-[43]   content   ::=   CharData? ((element | Reference | CDSect | PI | Comment) CharData?)*
+[43]   content
+       ::= CharData? ( ( element
+                       | Reference
+                       | CDSect
+                       | PI
+                       | Comment ) CharData? )*
 
 [44]   EmptyElemTag   ::=   '<' Name (S Attribute)* S? '/>'
 

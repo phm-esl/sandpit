@@ -154,69 +154,94 @@ Now we can see the trees in the woods. the result is a searchable Schema
 represented as a map:
 
     5> Schema = decode_XML:schema(Trim).
-    #{<<"Frequency36Choice">> =>
-          #{name => <<"Frequency36Choice">>,
-            choice =>
-                [#{name => <<"Tp">>,type => <<"Frequency6Code">>},
-                 #{name => <<"Prd">>,type => <<"FrequencyPeriod1">>},
-                 #{name => <<"PtInTm">>,
-                   type => <<"FrequencyAndMoment1">>}]},
-      <<"LEIIdentifier">> =>
-          #{name => <<"LEIIdentifier">>,type => string,
-            pattern => <<"[A-Z0-9]{18,18}[0-9]{2,2}">>},
-      <<"AddressType3Choice">> =>
-          #{name => <<"AddressType3Choice">>,
-            choice =>
-                [#{name => <<"Cd">>,type => <<"AddressType2Code">>},
-                 #{name => <<"Prtry">>,
-                   type => <<"GenericIdentification30">>}]},...}
+    #{{typedef,<<"PartyIdentification135">>} =>
+          #{name => <<"PartyIdentification135">>,
+            sequence =>
+                [{element,#{name => <<"Nm">>,type => <<"Max140Text">>,
+                            minOccurs => 0,maxOccurs => 1}},
+                 {element,#{name => <<"PstlAdr">>,type => <<"PostalAddress24">>,
+                            minOccurs => 0,maxOccurs => 1}},
+                 {element,#{name => <<"Id">>,type => <<"Party38Choice">>,
+                            minOccurs => 0,maxOccurs => 1}},
+                 {element,#{name => <<"CtryOfRes">>,type => <<"CountryCode">>,
+                            minOccurs => 0,maxOccurs => 1}},
+                 {element,#{name => <<"CtctDtls">>,type => <<"Contact4">>,
+                            minOccurs => 0,maxOccurs => 1}}]},
+      {typedef,<<"ProxyAccountIdentification1">>} =>
+          #{name => <<"ProxyAccountIdentification1">>,
+            sequence =>
+                [{element,#{name => <<"Tp">>,
+                            type => <<"ProxyAccountType1Choice">>,
+                            minOccurs => 0,maxOccurs => 1}},
+                 {element,#{name => <<"Id">>,type => <<"Max2048Text">>}}]},
+      {typedef,<<"ExternalPersonIdentification1Code">>} =>
+          #{name => <<"ExternalPersonIdentification1Code">>,
+            type => string,minLength => 1,maxLength => 4},...}
 
 The XSD top-level is a `Document` element:
 
-    6> maps:get(<<"Document">>,Schema).
+    6> maps:get({element,<<"Document">>},Schema).
+    #{name => <<"Document">>,
+      type => <<"Document">>}
+
+The type definition is also called `Document`, hence the distinct `element`
+and `typedef` tuple keys.
+
+    7> maps:get({typedef,<<"Document">>},Schema).
     #{name => <<"Document">>,
       sequence =>
-          [#{name => <<"FIToFIPmtStsRpt">>,
-             type => <<"FIToFIPaymentStatusReportV13">>}]}
+          [{element,#{name => <<"FIToFIPmtStsRpt">>,
+                      type => <<"FIToFIPaymentStatusReportV13">>}}]}
 
 It is now possible to search for the `type` that encodes the `Document`
 contents, in a type called `FIToFIPaymentStatusReportV13`:
 
-    7> maps:get(<<"FIToFIPaymentStatusReportV13">>,Schema).
+    8> maps:get({typedef,<<"FIToFIPaymentStatusReportV13">>},Schema).
     #{name => <<"FIToFIPaymentStatusReportV13">>,
       sequence =>
-          [#{name => <<"GrpHdr">>,type => <<"GroupHeader101">>},
-           #{name => <<"OrgnlGrpInfAndSts">>,
-             type => <<"OriginalGroupHeader17">>,minOccurs => 0,
-             maxOccurs => infinity},
-           #{name => <<"TxInfAndSts">>,
-             type => <<"PaymentTransaction142">>,minOccurs => 0,
-             maxOccurs => infinity},
-           #{name => <<"SplmtryData">>,type => <<"SupplementaryData1">>,
-             minOccurs => 0,maxOccurs => infinity}]}
+          [{element,#{name => <<"GrpHdr">>,
+                      type => <<"GroupHeader101">>}},
+           {element,#{name => <<"OrgnlGrpInfAndSts">>,
+                      type => <<"OriginalGroupHeader17">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}},
+           {element,#{name => <<"TxInfAndSts">>,
+                      type => <<"PaymentTransaction142">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}},
+           {element,#{name => <<"SplmtryData">>,
+                      type => <<"SupplementaryData1">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}}]}
 
 Within the `FIToFIPaymentStatusReportV13` there is a sequence of elements:
 
-    8> maps:get(<<"GroupHeader101">>,Schema).
+    9> maps:get({typedef,<<"GroupHeader101">>},Schema).
     #{name => <<"GroupHeader101">>,
       sequence =>
-          [#{name => <<"MsgId">>,type => <<"Max35Text">>},
-           #{name => <<"CreDtTm">>,type => <<"ISODateTime">>},
-           #{name => <<"InstgAgt">>,
-             type => <<"BranchAndFinancialInstitutionIdentification6">>,
-             minOccurs => 0,maxOccurs => 1},
-           #{name => <<"InstdAgt">>,
-             type => <<"BranchAndFinancialInstitutionIdentification6">>,
-             minOccurs => 0,maxOccurs => 1},
-           #{name => <<"OrgnlBizQry">>,
-             type => <<"OriginalBusinessQuery1">>,minOccurs => 0,
-             maxOccurs => 1}]}
+          [{element,#{name => <<"MsgId">>,
+                      type => <<"Max35Text">>}},
+           {element,#{name => <<"CreDtTm">>,
+                      type => <<"ISODateTime">>}},
+           {element,#{name => <<"InstgAgt">>,
+                      type => <<"BranchAndFinancialInstitutionIdentification6">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}},
+           {element,#{name => <<"InstdAgt">>,
+                      type => <<"BranchAndFinancialInstitutionIdentification6">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}},
+           {element,#{name => <<"OrgnlBizQry">>,
+                      type => <<"OriginalBusinessQuery1">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}}]}
 
 One of those elements is called `ISODateTime`. Lets have a closer look at
 that type definition:
 
-    9> maps:get(<<"ISODateTime">>,Schema).
-    #{name => <<"ISODateTime">>,type => dateTime}
+    10> maps:get({typedef,<<"ISODateTime">>},Schema).
+    #{name => <<"ISODateTime">>,
+      type => dateTime}
 
 This is a fundamental type that e.g. a message generator can produce
 random (or restrained) values for.
@@ -239,4 +264,302 @@ The composition of a complexType can either be:
 * `simpleContent`
 * `sequence`
 * `choice`
+
+
+
+# Testing XML generation
+
+
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"AddressType2Code">>,
+        Schema ) ).
+    <<"<AddressType2Code>DLVY</AddressType2Code>">>
+
+The `GenericIdentification30` contains an instance of `AddressType2Code`:
+
+    io:put_chars([
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"GenericIdentification30">>,
+        Schema)),$\n]).
+    <GenericIdentification30>
+      <Id>Generated value of Exact4AlphaNumericText</Id>
+      <Issr>Generated value of Max35Text</Issr>
+      <SchmeNm>Generated value of Max35Text</SchmeNm>
+    </GenericIdentification30>
+
+Generating forms that contain the above:
+
+    io:put_chars([
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"AddressType3Choice">>,
+        Schema)),$\n]).
+    <AddressType3Choice>
+      <Prtry>
+        <GenericIdentification30>
+          <Id>Generated value of Exact4AlphaNumericText</Id>
+          <Issr>Generated value of Max35Text</Issr>
+          <SchmeNm>Generated value of Max35Text</SchmeNm>
+        </GenericIdentification30>
+      </Prtry>
+    </AddressType3Choice>
+
+
+
+    file:write_file("tmp.xml",
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"PostalAddress24">>,
+        Schema ) ) ).
+
+    #> tidy -xml -indent <tmp.xml
+    <PostalAddress24>
+      <AdrTp>
+        <AddressType3Choice>
+          <Cd>
+            <AddressType2Code>DLVY</AddressType2Code>
+          </Cd>
+        </AddressType3Choice>
+      </AdrTp>
+      <Dept>Generated value of Max70Text</Dept>
+      <SubDept>Generated value of Max70Text</SubDept>
+      <StrtNm>Generated value of Max70Text</StrtNm>
+      <BldgNb>Generated value of Max16Text</BldgNb>
+      <BldgNm>Generated value of Max35Text</BldgNm>
+      <Flr>Generated value of Max70Text</Flr>
+      <PstBx>Generated value of Max16Text</PstBx>
+      <Room>Generated value of Max70Text</Room>
+      <PstCd>Generated value of Max16Text</PstCd>
+      <TwnNm>Generated value of Max35Text</TwnNm>
+      <TwnLctnNm>Generated value of Max35Text</TwnLctnNm>
+      <DstrctNm>Generated value of Max35Text</DstrctNm>
+      <CtrySubDvsn>Generated value of Max35Text</CtrySubDvsn>
+      <Ctry>Generated value of CountryCode</Ctry>
+      <AdrLine>Generated value of Max70Text</AdrLine>
+    </PostalAddress24>
+
+
+
+    file:write_file("tmp.xml",
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"BranchData3">>,
+        Schema ) ) ).
+
+     #> tidy -xml -indent <tmp.xml
+     <BranchData3>
+       <Id>Generated value of Max35Text</Id>
+       <LEI>Generated value of LEIIdentifier</LEI>
+       <Nm>Generated value of Max140Text</Nm>
+       <PstlAdr>
+         <PostalAddress24>
+           <AdrTp>
+             <AddressType3Choice>
+               <Prtry>
+                 <GenericIdentification30>
+                   <Id>Generated value of Exact4AlphaNumericText</Id>
+                   <Issr>Generated value of Max35Text</Issr>
+                   <SchmeNm>Generated value of Max35Text</SchmeNm>
+                 </GenericIdentification30>
+               </Prtry>
+             </AddressType3Choice>
+           </AdrTp>
+           <Dept>Generated value of Max70Text</Dept>
+           <SubDept>Generated value of Max70Text</SubDept>
+           <StrtNm>Generated value of Max70Text</StrtNm>
+           <BldgNb>Generated value of Max16Text</BldgNb>
+           <BldgNm>Generated value of Max35Text</BldgNm>
+           <Flr>Generated value of Max70Text</Flr>
+           <PstBx>Generated value of Max16Text</PstBx>
+           <Room>Generated value of Max70Text</Room>
+           <PstCd>Generated value of Max16Text</PstCd>
+           <TwnNm>Generated value of Max35Text</TwnNm>
+           <TwnLctnNm>Generated value of Max35Text</TwnLctnNm>
+           <DstrctNm>Generated value of Max35Text</DstrctNm>
+           <CtrySubDvsn>Generated value of Max35Text</CtrySubDvsn>
+           <Ctry>Generated value of CountryCode</Ctry>
+           <AdrLine>Generated value of Max70Text</AdrLine>
+         </PostalAddress24>
+       </PstlAdr>
+     </BranchData3>
+
+    io:put_chars([
+    decode_XML:encode(
+      decode_XML:generate_from_schema(
+        <<"LEIIdentifier">>,
+        Schema)),$\n]).
+
+
+Generating from string patterns:
+
+    decode_XML:parse_pattern(
+      <<"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}">>).
+    <<"70e74fa2-c87a-4d99-b3cc-061db627e2d1">>
+
+    Patterns =
+     [<<"[A-Z]{3,3}">>,
+      <<"[A-Z0-9]{4,4}[A-Z]{2,2}[A-Z0-9]{2,2}([A-Z0-9]{3,3}){0,1}">>,
+      <<"[A-Z]{2,2}">>,
+      <<"[0-9]{2}">>,
+      <<"[a-zA-Z0-9]{4}">>,
+      <<"[A-Z]{2,2}[0-9]{2,2}[a-zA-Z0-9]{1,30}">>,
+      <<"[A-Z0-9]{18,18}[0-9]{2,2}">>,
+      <<"[0-9]{1,15}">>,
+      <<"\+[0-9]{1,3}-[0-9()+\-]{1,30}">>,
+      <<"[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}">>].
+
+    [decode_XML:parse_pattern(P) || P <- Patterns].
+
+Example output for the above patterns found in the XSD file:
+
+    [<<"HGO">>,
+     <<"X6QLEIOT(9KJ)">>,
+     <<"GO">>,
+     <<"31">>,
+     <<"VkVj">>,
+     <<"OT82zWVZ6YY58rfEuyiaPpX7cdgciF1">>,
+     <<"D5VLRCJWQ0XNCUO9RY80">>,
+     <<"78">>,
+     <<"+92-(37(68))631+44+)6(0+448-0">>,
+     <<"914a953e-03b1-421c-841b-56e709b21f3a">>]
+
+    [<<"VDX">>,
+     <<"98S9GO74(FPI)">>,
+     <<"AU">>,
+     <<"36">>,
+     <<"UV1I">>,
+     <<"RJ18nk0p0UddP1GCm6A3O9tAZxL5BK9b">>,
+     <<"RCAMHLLLS0P1X09NWN02">>,
+     <<"1537">>,
+     <<"+37-82)8(0)1269106---8578">>,
+     <<"bda7489b-232c-4cf5-9d57-c9107d7d4a88">>]
+
+    [<<"HDY">>,
+     <<"C3Y6IDTD(QY5)">>,
+     <<"GX">>,
+     <<"70">>,
+     <<"uxm6">>,
+     <<"AT94R317C6I2bijxB">>,
+     <<"5GJ0BJ4VIGACY3QDQ557">>,
+     <<"43937857435385">>,
+     <<"+543-530-(-0+357626-71(70">>,
+     <<"64b5d8ff-5ed0-4e6a-9a5e-37065642c1c6">>]
+
+
+
+------------------------------------------------
+
+
+Manual testing recipies:
+
+    1> {ok,Bin} = file:read_file("ISO20022/pacs.002.001.13.xsd").
+    2> Pacs002 = decode_XML:document(Bin).
+    3> Trim = decode_XML:trim_namespace(Pacs002).
+    4> Schema = decode_XML:schema(Trim).
+
+    5> maps:get({element,<<"Document">>},Schema).
+    #{name => <<"Document">>,type => <<"Document">>}
+
+    6> maps:get({typedef,<<"Document">>},Schema).
+    {sequence,[{element,#{name => <<"FIToFIPmtStsRpt">>,
+                          type => <<"FIToFIPaymentStatusReportV13">>}}]}
+
+The following is expected to fail:
+
+    try maps:get({typedef,<<"FIToFIPmtStsRpt">>},Schema) catch What:Why ->
+    {What,Why} end.
+    {error,{badkey,{typedef,<<"FIToFIPmtStsRpt">>}}}
+
+Successful lookup results:
+
+    maps:get({typedef,<<"FIToFIPaymentStatusReportV13">>},Schema).
+    #{name => <<"FIToFIPaymentStatusReportV13">>,
+      sequence =>
+          [{element,#{name => <<"GrpHdr">>,
+                      type => <<"GroupHeader101">>}},
+           {element,#{name => <<"OrgnlGrpInfAndSts">>,
+                      type => <<"OriginalGroupHeader17">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}},
+           {element,#{name => <<"TxInfAndSts">>,
+                      type => <<"PaymentTransaction142">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}},
+           {element,#{name => <<"SplmtryData">>,
+                      type => <<"SupplementaryData1">>,
+                      minOccurs => 0,
+                      maxOccurs => infinity}}]}
+
+
+    maps:get({typedef,<<"GroupHeader101">>},Schema).
+    #{name => <<"GroupHeader101">>,
+      sequence =>
+          [{element,#{name => <<"MsgId">>,
+                      type => <<"Max35Text">>}},
+           {element,#{name => <<"CreDtTm">>,
+                      type => <<"ISODateTime">>}},
+           {element,#{name => <<"InstgAgt">>,
+                      type => <<"BranchAndFinancialInstitutionIdentification6">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}},
+           {element,#{name => <<"InstdAgt">>,
+                      type => <<"BranchAndFinancialInstitutionIdentification6">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}},
+           {element,#{name => <<"OrgnlBizQry">>,
+                      type => <<"OriginalBusinessQuery1">>,
+                      minOccurs => 0,
+                      maxOccurs => 1}}]}
+
+
+    maps:get({typedef,<<"Max35Text">>},Schema).
+    #{name => <<"Max35Text">>,
+      type => string,
+      minLength => 1,
+      maxLength => 35}
+
+
+    maps:get({typedef,<<"AddressType2Code">>},Schema).
+    #{name => <<"AddressType2Code">>,
+      type => string,
+      enumeration =>
+          [<<"ADDR">>,
+           <<"PBOX">>,
+           <<"HOME">>,
+           <<"BIZZ">>,
+           <<"MLTO">>,
+           <<"DLVY">>]}
+
+
+    maps:get({typedef,<<"ActiveOrHistoricCurrencyCode">>},Schema).
+    #{name => <<"ActiveOrHistoricCurrencyCode">>,
+      type => string,
+      pattern => <<"[A-Z]{3,3}">>}
+
+
+    maps:get({typedef,<<"Frequency36Choice">>},Schema).
+    #{name => <<"Frequency36Choice">>,
+      choice =>
+          [{element,#{name => <<"Tp">>,
+                      type => <<"Frequency6Code">>}},
+           {element,#{name => <<"Prd">>,
+                      type => <<"FrequencyPeriod1">>}},
+           {element,#{name => <<"PtInTm">>,
+                      type => <<"FrequencyAndMoment1">>}}]}
+
+
+    maps:get({typedef,<<"Max10KBinary">>},Schema).
+    #{name => <<"Max10KBinary">>,
+      type => base64,
+      minLength => 1,
+      maxLength => 10240}
+
+    maps:get({typedef,<<"ActiveOrHistoricCurrencyAndAmount_SimpleType">>},Schema).
+    #{name => <<"ActiveOrHistoricCurrencyAndAmount_SimpleType">>,
+      type => decimal,
+      fractionDigits => 5,
+      totalDigits => 18,
+      minInclusive => 0}
 

@@ -1,13 +1,17 @@
 -module(decode_XML).
 
 -export(
- [ raw_text/1
+ [ encode/1
+ , generate_from_XSD_file/2
+ , generate_from_schema/2
+ , raw_text/1
  , schema/1
  , trim_namespace/1
  , document/1 ] ).
 
 -export(
- [ test/0
+ [ parse_pattern/1
+ , test/0
  , test_fragments/0 ] ).
 
 -define(space,$\s).
@@ -46,6 +50,208 @@
 
 -define(dbg(F,A),io:format("~p:~p "++F,[?FUNCTION_NAME,?LINE|A])).
 
+
+encode(In) -> erlang:list_to_binary(encode_elements(In)).
+
+encode_elements([]) -> [];
+encode_elements([Head|Tail]) -> [encode_elements(Head)|encode_elements(Tail)];
+encode_elements(Binary) when is_binary(Binary) -> Binary;
+encode_elements(#element{} = Element) ->
+  Attr = encode_attributes(Element),
+  case Element of
+    #element{ name = Name, content = empty} ->
+      [ ?less_than, Name, Attr, ?empty_element ];
+    #element{ name = Name, content = [] } ->
+      [ ?less_than, Name, Attr, ?empty_element ];
+    #element{ name = Name, content = Content } ->
+      Fill = encode_elements(Content),
+      [ ?less_than, Name, Attr, ?greater_than,
+        Fill,
+        ?end_tag, Name, ?greater_than ] end.
+
+encode_attributes(Element) ->
+  Attr = Element#element.attributes,
+  case maps:fold(fun encode_each_attr/3,[],Attr) of
+    [] -> [];
+    Out -> tl(Out) end.
+
+encode_each_attr(Name,Value,Out) ->
+  Quote = quote_value(Value),
+  [ ?space, Name, ?equal, Quote, Value, Quote | Out ].
+
+quote_value(Value) -> quote_value(0,Value).
+
+quote_value(Pos,Bin) when Pos < size(Bin) ->
+  case Bin of
+    << _:Pos/binary, $", _/binary >> -> $';
+    << _:Pos/binary, $', _/binary >> -> $";
+    _ -> quote_value(Pos + 1,Bin) end;
+quote_value(_,_) -> $".
+
+%%%
+%%%   The result is the Erlang term representing an XML
+%%%   document with #element{} records.
+%%%
+generate_from_XSD_file(File_name,Type_name) ->
+  {ok,Bin} = file:read_file(File_name),
+  Document = document(Bin),
+  Trimmed = trim_namespace(Document),
+  Schema = schema(Trimmed),
+  generate_from_schema(Type_name,Schema).
+
+generate_from_schema(Type_name,Schema)
+when is_binary(Type_name), is_map(Schema) ->
+  Node = maps:get({typedef,Type_name},Schema),
+  generate_from_node(Node,Schema).
+
+generate_from_node(Node,Schema) ->
+  Name = maps:get(name,Node),
+  case Node of
+    #{ pattern := Pattern } -> generate_pattern(Pattern);
+    #{ enumeration := Enum } ->
+      #element{
+        name = Name,
+        content = [pick_random(Enum)] };
+    #{ type := string } -> generate_TODO(Name);
+    #{ choice := Choice } ->
+      #element{
+        name = Name,
+        content = [generate_choice(Choice,Schema)] };
+    #{ sequence := any } ->
+      #element{
+        name = Name,
+        content = generate_any_sequence() };
+    #{ sequence := Sequence } when is_list(Sequence) ->
+      #element{
+        name = Name,
+        content = generate_sequence(Sequence,Schema) };
+    #{ extension := _, base := Base } ->
+      %
+      % TODO: the extension data has to be put to use...
+      %
+      #element{
+        name = Name,
+        content = [generate_from_schema(Base,Schema)] };
+    #{ type := Type } when is_binary(Type) ->
+      #element{
+        name = Name,
+        content = [generate_from_schema(Type,Schema)] };
+    #{ type := date } -> generate_TODO(Name);
+    #{ type := dateTime } -> generate_TODO(Name);
+    #{ type := year } -> generate_TODO(Name);
+    #{ type := boolean } -> generate_boolean();
+    #{ type := base64 } -> generate_TODO(Name);
+    #{ type := decimal } -> generate_TODO(Name) end.
+
+%%%
+%%%   Following generators are NOT adequate
+%%%
+generate_TODO(Name) ->
+  [<< "Generated value of ",  Name/binary >>].
+
+generate_any_sequence() ->
+  [<<"Generated value of any sequence ...">>].
+
+generate_pattern(Pattern) ->
+  [<< "Generated pattern ", Pattern/binary >>].
+
+parse_pattern(Pattern) ->
+  erlang:list_to_binary(generate(parse_pattern(0,Pattern,[]),[])).
+
+generate([],Out) -> Out;
+generate([Gen|Rest],Out) -> generate(Rest,[Gen()|Out]).
+
+parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
+  case Pattern of
+    << _:Pos/binary, $\\, A, _/binary >> ->
+      parse_pattern(Pos + 2,Pattern,[A|Out]);
+    << _:Pos/binary, $[, _/binary >> ->
+      {End,Gen} = gen_range(Pos + 1,Pattern),
+      parse_pattern(End,Pattern,[Gen|Out]);
+    << _:Pos/binary, ${, _/binary >> ->
+      {End,Gen} = gen_repeat(Pos + 1,Pattern,hd(Out)),
+      parse_pattern(End,Pattern,[Gen|tl(Out)]);
+    << _:Pos/binary, C, _/binary >> ->
+      parse_pattern(Pos + 1,Pattern,[fun () -> C end|Out]) end;
+parse_pattern(_,_,Out) -> Out.
+
+gen_range(Pos,Pattern) -> gen_range(Pos,Pattern,[]).
+
+gen_range(Pos,Pattern,[B,$-,A|Out]) ->
+  gen_range(Pos,Pattern,gen_seq(A,B,Out));
+
+gen_range(Pos,Pattern,Out) when Pos < size(Pattern) ->
+  case Pattern of
+    << _:Pos/binary, $\\, A, _/binary >> ->
+      gen_range(Pos + 2,Pattern,[A|Out]);
+    << _:Pos/binary, $], _/binary >> ->
+      {Pos + 1, fun () -> pick_random(Out) end};
+    << _:Pos/binary, C, _/binary >> ->
+      gen_range(Pos + 1, Pattern,[C|Out]) end.
+
+gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
+gen_seq(B,B,Out) -> [B|Out].
+
+
+gen_repeat(Pos,Pattern,Gen) when is_function(Gen) ->
+  gen_repeat(Pos,0,Pattern,Gen).
+
+gen_repeat(Pos,N,Pattern,Gen)
+when Pos < size(Pattern), is_function(Gen) ->
+  case Pattern of
+    << _:Pos/binary, $}, _/binary >> ->
+      {Pos + 1, gen_repeat_fun(N,Gen)};
+    << _:Pos/binary, $,, _/binary >> ->
+      gen_repeat_min_max(Pos + 1,N,0,Pattern,Gen);
+    << _:Pos/binary, X, _/binary >> when $0 =< X, X =< $9 ->
+      gen_repeat(Pos + 1,10 * N + X - $0,Pattern,Gen) end.
+
+gen_repeat_min_max(Pos,Min,Max,Pattern,Gen) when Pos < size(Pattern) ->
+  case Pattern of
+    << _:Pos/binary, $}, _/binary >> ->
+      {Pos + 1, gen_repeat_fun(Min,Max,Gen)};
+    << _:Pos/binary, X, _/binary >> when $0 =< X, X =< $9 ->
+      gen_repeat_min_max(Pos + 1,Min,10 * Max + X - $0,Pattern,Gen) end.
+
+
+gen_repeat_fun(N,Gen) ->
+  fun () -> (repeat(Gen))(N) end.
+
+gen_repeat_fun(N,N,Gen) ->
+  fun () -> (repeat(Gen))(N) end;
+gen_repeat_fun(Min,Max,Gen) when Min < Max ->
+  fun () -> (repeat(Gen))(Min + rand:uniform(Max - Min)) end.
+
+repeat(Gen) ->
+  fun Fn(0) -> []; Fn(N) when N > 0 -> [Gen()|Fn(N-1)] end.
+
+%%%
+%%%   Following generators are adequate:
+%%%
+generate_boolean() ->
+  Bool = case rand:uniform(2) of
+    1 -> <<"FALSE">>;
+    2 -> <<"TRUE">> end,
+  [Bool].
+
+generate_sequence(Sequence,Schema) ->
+  Each = fun ({element,I},O) ->
+    Element = generate_from_node(I,Schema),
+    [Element|O] end,
+  lists:reverse(lists:foldl(Each,[],Sequence)).
+
+generate_choice(Choice,Schema) ->
+  {element,Pick} = pick_random(Choice),
+  generate_from_node(Pick,Schema).
+
+pick_random(Choice) ->
+  Length = length(Choice),
+  N = rand:uniform(Length),
+  lists:nth(N,Choice).
+
+%%%
+%%%   Extract the raw document text without the markup decoration.
+%%%
 raw_text(In) ->
   white_space(
     erlang:list_to_binary(raw_each(In)),
@@ -61,7 +267,9 @@ raw_each([],Out) -> Out;
 raw_each([Each|Rest],Out) ->
   raw_each(Rest,lists:reverse(raw_each(Each),Out)).
 
-
+%%%
+%%%   Remove namespace prefixes from element names.
+%%%
 trim_namespace(In) -> trim_each(In).
 
 trim_each(#element{} = In) ->
@@ -91,7 +299,6 @@ trim_name(Name) when is_binary(Name) ->
 %%%
 schema([]) -> [];
 schema([ #element{ name = <<"schema">> } = Schema |_]) ->
-%  lists:reverse(schema(Schema#element.content,[]));
   schema(Schema#element.content,#{});
 schema([_|Rest]) -> schema(Rest).
 
@@ -101,12 +308,13 @@ schema([#element{} = In|Rest],Out) ->
   Keys = #{ <<"name">> => name, <<"type">> => type },
   Attr = get_attributes(Keys,In),
   Name = maps:get(name,Attr),
-  Type = case In#element.name of
-    <<"element">> -> Attr;
-    <<"complexType">> -> complexType(Name,Content);
-    <<"simpleType">> -> simpleType(Name,Content) end,
-  if is_list(Out) -> schema(Rest,[Type|Out]);
-     is_map(Out) -> schema(Rest,Out#{ Name => Type }) end;
+  case In#element.name of
+    <<"element">> ->
+      schema(Rest,Out#{ {element,Name} => Attr });
+    <<"complexType">> ->
+      schema(Rest,Out#{ {typedef,Name} => complexType(Name,Content) });
+    <<"simpleType">> ->
+      schema(Rest,Out#{ {typedef,Name} => simpleType(Name,Content) }) end;
 schema([_|Rest],Out) -> schema(Rest,Out).
 
 
@@ -146,7 +354,7 @@ decimalType([Each|Rest],Out) ->
     << "minInclusive"   >> -> decimalType(Rest,Out#{ minInclusive => Value }) end.
 
 stringType([#element{ name = <<"enumeration">>}|_]=In,Out) ->
-  enumerationType(In,Out);
+  Out#{ enumeration => enumerationType(In) };
 stringType([#element{ name = <<"pattern">> }=In],Out) ->
   % value="[A-Z]{3,3}"
   % value="[A-Z0-9]{4,4}[A-Z]{2,2}[A-Z0-9]{2,2}([A-Z0-9]{3,3}){0,1}"
@@ -175,11 +383,11 @@ patternType(In,Out) ->
   #{<<"value">> := Value} = get_attributes([<< "value" >>],In),
   Out#{ pattern => Value }.
 
-enumerationType([],Out) -> Out;
-enumerationType([#element{ name = << "enumeration" >> } = Element|Rest],Out) ->
+enumerationType([]) -> [];
+enumerationType([#element{ name = << "enumeration" >> } = Element|Rest]) ->
   #{<<"value">> := Value} = get_attributes([<< "value" >>],Element),
-  Enum = maps:get(enumeration,Out,[]),
-  enumerationType(Rest,Out#{ enumeration => [Value|Enum] }).
+  [Value|enumerationType(Rest)].
+
 
 
 
@@ -189,36 +397,41 @@ complexType(Name,[Element]) ->
     content = Content } = Element,
   case Type of
     << "simpleContent" >> -> simpleContent(Content,#{ name => Name });
-    << "sequence" >> -> sequence(Content,#{ name => Name },[]);
-    << "choice" >> -> choice(Content,#{ name => Name },[]) end.
+    << "sequence" >> -> sequence(Content,#{ name => Name });
+    << "choice" >> -> choice(Content,#{ name => Name }) end.
 
 simpleContent([#element{ name = <<"extension">> }=Element],Out) ->
   Content = Element#element.content,
   #{ <<"base">> := Base } = get_attributes([<<"base">>],Element),
   Out#{ base => Base, extension => Content }.
 
-sequence([],Out,Seq) -> Out#{ sequence => lists:reverse(Seq) };
-sequence([#element{ name = << "any" >> }],Out,[]) ->
-  Out#{ sequence => any };
-sequence([#element{ name = << "element" >> } = Element|Rest],Out,Seq) ->
+
+sequence([#element{ name = << "any" >> }],Out) -> Out#{ sequence => any };
+sequence(Content,Out) -> Out#{ sequence => sequence(Content) }.
+
+sequence([]) -> [];
+sequence([#element{ name = << "element" >> } = Element|Rest]) ->
   Keys = #{
     <<"name">> => name,
     <<"type">> => type,
     <<"minOccurs">> => {minOccurs,fun erlang:binary_to_integer/1},
     <<"maxOccurs">> => {maxOccurs,fun to_integer/1} },
   Values = get_attributes(Keys,Element),
-  sequence(Rest,Out,[Values|Seq]).
+  [{element,Values}|sequence(Rest)].
+
 
 to_integer(<<"unbounded">>) -> infinity;
 to_integer(Bin) -> erlang:binary_to_integer(Bin).
 
-choice([],Out,Choice) -> Out#{ choice => lists:reverse(Choice) };
-choice([#element{ name = << "element" >> } = Element|Rest],Out,Choice) ->
+choice(Content,Out) -> Out#{ choice => choice(Content) }.
+
+choice([]) -> [];
+choice([#element{ name = << "element" >> } = Element|Rest]) ->
   Keys = #{
     <<"name">> => name,
     <<"type">> => type },
   Values = get_attributes(Keys,Element),
-  choice(Rest,Out,[Values|Choice]).
+  [{element,Values}|choice(Rest)].
 
 get_attributes(Keys,Element) when is_list(Keys) ->
   maps:with(Keys,Element#element.attributes);

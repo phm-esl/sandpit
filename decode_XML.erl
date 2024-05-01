@@ -1,11 +1,14 @@
 -module(decode_XML).
 
--export([
-  document/1]).
+-export(
+ [ raw_text/1
+ , schema/1
+ , trim_namespace/1
+ , document/1 ] ).
 
--export([
-  test/0,
-  test_fragments/0 ]).
+-export(
+ [ test/0
+ , test_fragments/0 ] ).
 
 -define(space,$\s).
 -define(tab,$\t).
@@ -42,6 +45,193 @@
     content = [] }).
 
 -define(dbg(F,A),io:format("~p:~p "++F,[?FUNCTION_NAME,?LINE|A])).
+
+raw_text(In) ->
+  white_space(
+    erlang:list_to_binary(raw_each(In)),
+    fun (I) -> I end ).
+
+raw_each(#element{ content = Content }) -> raw_each(Content);
+raw_each(Text) when is_binary(Text) -> [Text];
+raw_each(Content) when is_list(Content) ->
+  lists:reverse(raw_each(Content,[]));
+raw_each(_) -> [].
+
+raw_each([],Out) -> Out;
+raw_each([Each|Rest],Out) ->
+  raw_each(Rest,lists:reverse(raw_each(Each),Out)).
+
+
+trim_namespace(In) -> trim_each(In).
+
+trim_each(#element{} = In) ->
+  #element{
+     name = Name,
+  content = Content } = In,
+  [In#element{
+       name = trim_name(Name),
+    content = trim_namespace(Content) }];
+trim_each(Text) when is_binary(Text) ->
+  white_space(Text,fun (<<>>) -> []; (I) -> [I] end);
+trim_each(Content) when is_list(Content) ->
+  lists:reverse(trim_each(Content,[]));
+trim_each(_) -> [].
+
+trim_each([],Out) -> Out;
+trim_each([Each|Rest],Out) ->
+  trim_each(Rest,lists:reverse(trim_each(Each),Out)).
+
+trim_name(Name) when is_binary(Name) ->
+  lists:last(binary:split(Name,<<$:>>,[global])).
+
+%%%
+%%%   After parsing with document/1, then with
+%%%   trim_namespace/1, convert the XSD docuemnt into a map of
+%%%   names and types that represent the document schema.
+%%%
+schema([]) -> [];
+schema([ #element{ name = <<"schema">> } = Schema |_]) ->
+%  lists:reverse(schema(Schema#element.content,[]));
+  schema(Schema#element.content,#{});
+schema([_|Rest]) -> schema(Rest).
+
+schema([],Out) -> Out;
+schema([#element{} = In|Rest],Out) ->
+  #element{ content = Content } = In,
+  Keys = #{ <<"name">> => name, <<"type">> => type },
+  Attr = get_attributes(Keys,In),
+  Name = maps:get(name,Attr),
+  Type = case In#element.name of
+    <<"element">> -> Attr;
+    <<"complexType">> -> complexType(Name,Content);
+    <<"simpleType">> -> simpleType(Name,Content) end,
+  if is_list(Out) -> schema(Rest,[Type|Out]);
+     is_map(Out) -> schema(Rest,Out#{ Name => Type }) end;
+schema([_|Rest],Out) -> schema(Rest,Out).
+
+
+
+simpleType(Name,[#element{ name = <<"restriction">> } = Element]) ->
+  #element{
+    attributes = Attr,
+    content = Content } = Element,
+  case trim_name(maps:get(<< "base" >>, Attr)) of
+    << "date"     >> -> #{ type => date, name => Name };
+    << "dateTime" >> -> #{ type => dateTime, name => Name };
+    << "gYear"    >> -> #{ type => year, name => Name };
+    << "boolean"  >> -> #{ type => boolean, name => Name };
+    << "base64Binary" >> ->
+      base64Binary(Content,#{ type => base64, name => Name });
+    << "decimal" >> ->
+      decimalType(Content,#{ type => decimal, name => Name });
+    << "string" >> ->
+      stringType(Content,#{ type => string, name => Name }) end.
+
+base64Binary([],Out) -> Out;
+base64Binary([Each|Rest],Out) ->
+  Value = get_integer_attribute(<<"value">>,Each),
+  case Each#element.name of
+    << "minLength" >> -> base64Binary(Rest,Out#{ minLength => Value });
+    << "maxLength" >> -> base64Binary(Rest,Out#{ maxLength => Value }) end.
+
+get_integer_attribute(Key,Element) ->
+  binary_to_integer(maps:get(Key,Element#element.attributes)).
+
+decimalType([],Out) -> Out;
+decimalType([Each|Rest],Out) ->
+  Value = get_integer_attribute(<<"value">>,Each),
+  case Each#element.name of
+    << "fractionDigits" >> -> decimalType(Rest,Out#{ fractionDigits => Value });
+    << "totalDigits"    >> -> decimalType(Rest,Out#{ totalDigits => Value });
+    << "minInclusive"   >> -> decimalType(Rest,Out#{ minInclusive => Value }) end.
+
+stringType([#element{ name = <<"enumeration">>}|_]=In,Out) ->
+  enumerationType(In,Out);
+stringType([#element{ name = <<"pattern">> }=In],Out) ->
+  % value="[A-Z]{3,3}"
+  % value="[A-Z0-9]{4,4}[A-Z]{2,2}[A-Z0-9]{2,2}([A-Z0-9]{3,3}){0,1}"
+  % value="[A-Z]{2,2}"
+  % value="[0-9]{2}"
+  % value="[a-zA-Z0-9]{4}"
+  % value="[A-Z]{2,2}[0-9]{2,2}[a-zA-Z0-9]{1,30}"
+  % value="[A-Z0-9]{18,18}[0-9]{2,2}"
+  % value="[0-9]{1,15}"
+  % value="\+[0-9]{1,3}-[0-9()+\-]{1,30}"
+  % value="[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}"
+  patternType(In,Out);
+stringType(In,Out) -> bytesType(In,Out).
+
+bytesType([],Out) -> Out;
+bytesType([Each|Rest],Out) ->
+  case Each#element.name of
+    << "minLength" >> ->
+      Value = get_integer_attribute(<<"value">>,Each),
+      stringType(Rest,Out#{ minLength => Value });
+    << "maxLength" >> ->
+      Value = get_integer_attribute(<<"value">>,Each),
+      stringType(Rest,Out#{ maxLength => Value }) end.
+
+patternType(In,Out) ->
+  #{<<"value">> := Value} = get_attributes([<< "value" >>],In),
+  Out#{ pattern => Value }.
+
+enumerationType([],Out) -> Out;
+enumerationType([#element{ name = << "enumeration" >> } = Element|Rest],Out) ->
+  #{<<"value">> := Value} = get_attributes([<< "value" >>],Element),
+  Enum = maps:get(enumeration,Out,[]),
+  enumerationType(Rest,Out#{ enumeration => [Value|Enum] }).
+
+
+
+complexType(Name,[Element]) ->
+  #element{
+    name = Type,
+    content = Content } = Element,
+  case Type of
+    << "simpleContent" >> -> simpleContent(Content,#{ name => Name });
+    << "sequence" >> -> sequence(Content,#{ name => Name },[]);
+    << "choice" >> -> choice(Content,#{ name => Name },[]) end.
+
+simpleContent([#element{ name = <<"extension">> }=Element],Out) ->
+  Content = Element#element.content,
+  #{ <<"base">> := Base } = get_attributes([<<"base">>],Element),
+  Out#{ base => Base, extension => Content }.
+
+sequence([],Out,Seq) -> Out#{ sequence => lists:reverse(Seq) };
+sequence([#element{ name = << "any" >> }],Out,[]) ->
+  Out#{ sequence => any };
+sequence([#element{ name = << "element" >> } = Element|Rest],Out,Seq) ->
+  Keys = #{
+    <<"name">> => name,
+    <<"type">> => type,
+    <<"minOccurs">> => {minOccurs,fun erlang:binary_to_integer/1},
+    <<"maxOccurs">> => {maxOccurs,fun to_integer/1} },
+  Values = get_attributes(Keys,Element),
+  sequence(Rest,Out,[Values|Seq]).
+
+to_integer(<<"unbounded">>) -> infinity;
+to_integer(Bin) -> erlang:binary_to_integer(Bin).
+
+choice([],Out,Choice) -> Out#{ choice => lists:reverse(Choice) };
+choice([#element{ name = << "element" >> } = Element|Rest],Out,Choice) ->
+  Keys = #{
+    <<"name">> => name,
+    <<"type">> => type },
+  Values = get_attributes(Keys,Element),
+  choice(Rest,Out,[Values|Choice]).
+
+get_attributes(Keys,Element) when is_list(Keys) ->
+  maps:with(Keys,Element#element.attributes);
+get_attributes(Keys,Element) when is_map(Keys) ->
+  Attr = Element#element.attributes,
+  Each = fun (Lookup,Insert,Out) ->
+    case Attr of
+      #{ Lookup := Val } ->
+        case Insert of
+          {Ins,Fn} -> Out#{ Ins => Fn(Val) };
+          _ -> Out#{ Insert => Val } end;
+      #{ } -> Out end end,
+  maps:fold(Each,#{},Keys).
 
 %%%
 %%%   Parser that hews closely to the grammer as specified in

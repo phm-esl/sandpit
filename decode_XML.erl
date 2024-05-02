@@ -48,7 +48,7 @@
     attributes = #{},
     content = [] }).
 
--define(dbg(F,A),io:format("~p:~p "++F,[?FUNCTION_NAME,?LINE|A])).
+-define(dbg(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
 
 encode(In) -> erlang:list_to_binary(encode_elements(In)).
@@ -67,13 +67,13 @@ encode_elements(#element{} = Element) ->
       Fill = encode_elements(Content),
       [ ?less_than, Name, Attr, ?greater_than,
         Fill,
-        ?end_tag, Name, ?greater_than ] end.
+        ?end_tag, Name, ?greater_than ] end;
+encode_elements({prolog,Prolog}) ->
+  [ "<?xml", Prolog, "?>" ].
 
 encode_attributes(Element) ->
   Attr = Element#element.attributes,
-  case maps:fold(fun encode_each_attr/3,[],Attr) of
-    [] -> [];
-    Out -> tl(Out) end.
+  maps:fold(fun encode_each_attr/3,[],Attr).
 
 encode_each_attr(Name,Value,Out) ->
   Quote = quote_value(Value),
@@ -96,8 +96,16 @@ generate_from_XSD_file(File_name,Type_name) ->
   {ok,Bin} = file:read_file(File_name),
   Document = document(Bin),
   Trimmed = trim_namespace(Document),
+  [{element,<<"schema">>,Attrib,_}] = Trimmed,
+  Namespace = maps:get(<<"targetNamespace">>,Attrib),
   Schema = schema(Trimmed),
-  generate_from_schema(Type_name,Schema).
+  Top = generate_from_schema(Type_name,Schema),
+  {element,<<"Document">>,Doc_attr,Content} = Top,
+  [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
+    { element,
+      <<"Document">>,
+      Doc_attr#{ <<"xmlns">> => Namespace },
+      Content } ].
 
 generate_from_schema(Type_name,Schema)
 when is_binary(Type_name), is_map(Schema) ->
@@ -118,38 +126,54 @@ generate_from_node(Node,Schema) ->
       #element{
         name = Name,
         content = [pick_random(Enum)] };
-    #{ type := string } -> generate_TODO(Name);
+    #{ type := string } ->
+       generate_TODO(<<"string ", Name/binary >>);
     #{ choice := Choice } ->
       #element{
         name = Name,
         content = [generate_choice(Choice,Schema)] };
     #{ sequence := any } ->
+      %
+      % They said "sequence of any". Might need <[CDATA[...]]> here?
+      %
+      Pattern = <<"[ -~]{0,999}">>,
+      Content = parse_pattern(Pattern),
       #element{
         name = Name,
-        content = generate_any_sequence() };
+        content = << "<![CDATA[", Content/binary, "]]>" >> };
     #{ sequence := Sequence } when is_list(Sequence) ->
       #element{
         name = Name,
         content = generate_sequence(Sequence,Schema) };
-    #{ extension := _, base := Base } ->
-      %
-      % TODO: the extension data has to be put to use...
-      %
+    #{ extension := Extend, base := Base } ->
       #element{
         name = Name,
+        attributes = generate_attributes(Extend,Schema),
         content = [generate_from_schema(Base,Schema)] };
     #{ type := Type } when is_binary(Type) ->
       #element{
         name = Name,
         content = [generate_from_schema(Type,Schema)] };
-    #{ type := date } -> generate_TODO(Name);
-    #{ type := dateTime } -> generate_TODO(Name);
-    #{ type := time } -> generate_TODO(Name);
-    #{ type := year } -> generate_TODO(Name);
-    #{ type := yearMonth } -> generate_TODO(Name);
+    #{ type := date } -> generate_date();
+    #{ type := dateTime } -> generate_dateTime();
+    #{ type := time } -> generate_time();
+    #{ type := year } -> generate_year();
+    #{ type := yearMonth } -> generate_yearMonth();
     #{ type := boolean } -> generate_boolean();
-    #{ type := base64 } -> generate_TODO(Name);
-    #{ type := decimal } -> generate_TODO(Name) end.
+    #{ type := base64, minLength := Min, maxLength := Max } ->
+      generate_base64(Min,Max);
+    #{ type := decimal, totalDigits := Total, fractionDigits := Fract } ->
+      %
+      % A bit hacky, I confess (-:
+      %
+      Left = integer_to_binary(Total - Fract),
+      Right = integer_to_binary(Fract),
+      Pattern = << "([1-9][0-9]{0,",
+                   Left/binary,
+                   "}).[0-9]{0,",
+                   Right/binary,
+                   "}" >>,
+      parse_pattern(Pattern) end.
 
 %%%
 %%%   Following generators are NOT adequate
@@ -157,14 +181,27 @@ generate_from_node(Node,Schema) ->
 generate_TODO(Name) ->
   [<< "Generated value of ",  Name/binary >>].
 
-generate_any_sequence() ->
-  [<<"Generated value of any sequence ...">>].
+%%%
+%%%   Following generators are adequate:
+%%%
+
+generate_attributes(Extend,Schema) ->
+  Each = fun (I,O) -> gen_each_attr(I,Schema,O) end,
+  lists:foldl(Each,#{},Extend).
+
+gen_each_attr({attribute,Attr},Schema,Out) ->
+  #{ name := Name, type := Type } = Attr,
+  Value = generate_from_schema(Type,Schema),
+  Out#{ Name => Value }.
+
 
 generate_pattern(Pattern) ->
   [parse_pattern(Pattern)].
 
 parse_pattern(Pattern) ->
-  try erlang:list_to_binary(generate(parse_pattern(0,Pattern,[]),[]))
+  try
+    {_,Generators} = parse_pattern(0,Pattern,[]),
+    erlang:list_to_binary(generate(Generators))
   catch What:Why:Where ->
     throw(
     #{ pattern => Pattern,
@@ -172,25 +209,78 @@ parse_pattern(Pattern) ->
        why => Why,
        where => Where}) end.
 
+generate(In) -> generate(In,[]).
+
 generate([],Out) -> Out;
+generate([Bin|Rest],Out) when is_binary(Bin) ->
+  generate(Rest,[Bin|Out]);
 generate([Gen|Rest],Out) when is_function(Gen) ->
   generate(Rest,[Gen()|Out]);
-generate([Char|Rest],Out) when is_integer(Char)  ->
-  generate(Rest,[Char|Out]).
+generate([Alternation|Rest],Out) when is_list(Alternation) ->
+  Gen = pick_random(Alternation),
+  generate([Gen|Rest],Out).
+
 
 parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
   case Pattern of
-    << _:Pos/binary, $\\, A, _/binary >> ->
-      parse_pattern(Pos + 2,Pattern,[A|Out]);
+    << _:Pos/binary, $|, _/binary >> -> % alternation
+      gen_alternation(Pos + 1,Pattern,Out);
+
+    << _:Pos/binary, $(, _/binary >> -> % grouping begin
+      {End,Gen} = gen_group(Pos + 1,Pattern),
+      parse_pattern(End,Pattern,[Gen|Out]);
+    << _:Pos/binary, $), _/binary >> -> % grouping finish
+      {Pos + 1,Out};
+
     << _:Pos/binary, $[, _/binary >> ->
       {End,Gen} = gen_range(Pos + 1,Pattern),
       parse_pattern(End,Pattern,[Gen|Out]);
     << _:Pos/binary, ${, _/binary >> ->
       {End,Gen} = gen_repeat(Pos + 1,Pattern,hd(Out)),
       parse_pattern(End,Pattern,[Gen|tl(Out)]);
-    << _:Pos/binary, C, _/binary >> ->
-      parse_pattern(Pos + 1,Pattern,[fun () -> C end|Out]) end;
-parse_pattern(_,_,Out) -> Out.
+
+%    << _:Pos/binary, X, _/binary >> when X =:= $+ ; X =:= $* ->
+%      throw(unbounded_repetition_not_implemented);
+
+    << _:Pos/binary, _/binary >> ->
+      {End,Gen} = gen_literal(Pos,Pattern),
+      parse_pattern(End,Pattern,[Gen|Out]) end;
+parse_pattern(Pos,_,Out) -> {Pos,Out}.
+
+
+
+gen_alternation(Pos,Pattern,[Head|Tail]) ->
+  {End,Gen} = parse_pattern(Pos,Pattern,[]),
+  if is_list(Head) -> {End,[[Gen|Head]|Tail]};
+     is_binary(Head) -> {End,[[Gen,Head]|Tail]};
+     is_function(Head) -> {End,[[Gen,Head]|Tail]} end.
+
+
+gen_literal(Pos,Pattern) -> gen_literal(Pos,0,Pattern).
+
+gen_literal(Pos,Len,Pattern) ->
+  N = Pos + Len,
+  if N < size(Pattern) ->
+    case Pattern of
+      << _:N/binary, $\\, _/binary >> ->
+          gen_literal(Pos,Len + 2,Pattern);
+      << _:N/binary, X, _/binary >> ->
+        if X =:= ${ ; X =:= $} ;
+           X =:= $( ; X =:= $) ;
+           X =:= $[ ; X =:= $] ;
+%           X =:= $+ ; %%%% one-or-more repetition
+%           X =:= $* ; %%%% zero-or-more repetiton
+           X =:= $| ->
+             Part = binary:part(Pattern,Pos,Len),
+            {Pos + Len,Part};
+           N < size(Pattern) -> gen_literal(Pos,Len + 1,Pattern) end end;
+    true -> Part = binary:part(Pattern,Pos,Len),
+            {Pos + Len,Part} end.
+
+
+gen_group(Pos,Pattern) ->
+  {End,Gen} = parse_pattern(Pos,Pattern,[]),
+  {End,fun () -> generate(Gen) end}.
 
 gen_range(Pos,Pattern) -> gen_range(Pos,Pattern,[]).
 
@@ -242,9 +332,57 @@ gen_repeat_fun(Min,Max,Gen) when Min < Max ->
 repeat(Gen) ->
   fun Fn(0) -> []; Fn(N) when N > 0 -> [Gen()|Fn(N-1)] end.
 
-%%%
-%%%   Following generators are adequate:
-%%%
+
+
+
+generate_dateTime() ->
+  Now = erlang:timestamp(),
+  {{Yr,Mo,Dy},{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
+  erlang:list_to_binary(
+      [pad(4,Yr),$-,pad(2,Mo),$-,pad(2,Dy),$T,
+       pad(2,Hr),$:,pad(2,Mn),$:,pad(2,Sc) ]).
+
+generate_date() ->
+  Now = erlang:timestamp(),
+  {{Yr,Mo,Dy},_} = calendar:now_to_universal_time(Now),
+  erlang:list_to_binary([ pad(4,Yr),$-,pad(2,Mo),$-,pad(2,Dy) ]).
+
+generate_time() ->
+  Now = erlang:timestamp(),
+  {_,{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
+  erlang:list_to_binary([ pad(2,Hr),$:,pad(2,Mn),$:,pad(2,Sc) ]).
+
+generate_year() ->
+  Now = erlang:timestamp(),
+  {{Yr,_,_},_} = calendar:now_to_universal_time(Now),
+  erlang:list_to_binary([ pad(4,Yr) ]).
+
+generate_yearMonth() ->
+  Now = erlang:timestamp(),
+  {{Yr,Mo,_},_} = calendar:now_to_universal_time(Now),
+  erlang:list_to_binary([ pad(4,Yr),$-,pad(2,Mo) ]).
+
+
+pad(W,N) when is_integer(N) ->
+  Zeros = << "000000" >>,
+  Bin = erlang:integer_to_binary(N),
+  case W =< byte_size(Zeros) andalso W - byte_size(Bin)
+    of Neg when Neg < 0 -> Bin
+     ; Pad when Pad =< byte_size(Zeros)
+       -> << Zeros:Pad/binary, Bin/binary >> end.
+
+
+
+
+
+
+generate_base64(Min,Max) ->
+  % NOTE The encoded output base64:encode
+  %      is 33% larger than input binary,
+  %      hence scale input by 2/3.
+  Len = 2 * (Min + rand:uniform(Max - Min)) div 3,
+  base64:encode(rand:bytes(Len)).
+
 generate_boolean() ->
   Bool = case rand:uniform(2) of
     1 -> <<"FALSE">>;
@@ -422,7 +560,17 @@ complexType(Name,[Element]) ->
 simpleContent([#element{ name = <<"extension">> }=Element],Out) ->
   Content = Element#element.content,
   #{ <<"base">> := Base } = get_attributes([<<"base">>],Element),
-  Out#{ base => Base, extension => Content }.
+  Out#{ base => Base, extension => extension(Content) }.
+
+
+extension([]) -> [];
+extension([H|T]) -> [extension(H)|extension(T)];
+extension(#element{ name = <<"attribute">> }=Element) ->
+  Keys = #{ <<"name">> => name, <<"type">> => type },
+  Values = get_attributes(Keys,Element),
+  {attribute,Values}.
+
+
 
 
 sequence([#element{ name = << "any" >> }],Out) -> Out#{ sequence => any };
@@ -535,7 +683,6 @@ comment(In,Done) when is_function(Done)  -> comment(In,0,Done).
 comment(In,Pos,Done) ->
   case In of
     << _:Pos/binary >> ->
-      ?dbg("",[]),
       fun (More) when is_binary(More) ->
         comment(<< In/binary, More/binary >>,Pos,Done) end;
     << Comment:Pos/binary, ?comment_end, Tail/binary >> ->

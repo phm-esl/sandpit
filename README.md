@@ -452,7 +452,7 @@ Example output for the above patterns found in the XSD file:
 ------------------------------------------------
 
 
-Manual testing recipies:
+# Manual testing recipies:
 
     1> {ok,Bin} = file:read_file("ISO20022/pacs.002.001.13.xsd").
     2> Pacs002 = decode_XML:document(Bin).
@@ -563,3 +563,144 @@ Successful lookup results:
       totalDigits => 18,
       minInclusive => 0}
 
+
+
+
+
+
+
+
+# Generate XML from XSD - example
+
+Date: 2024-05-02T10:08
+Location: phm@SugoiRingo:~/Repos/Workshop/sandpit
+
+
+Write to `rmp.xml` the XML message generated from the XSD file
+`camt.053.001.11.xsd`:
+
+    file:write_file(
+      "tmp.xml",
+      decode_XML:encode(
+        decode_XML:generate_from_XSD_file(
+          "ISO20022/camt.053.001.11.xsd",
+          <<"Document">> ) ) ).
+
+The result (fragment):
+
+    #> tidy -xml -indent \
+       < tmp.xml \
+       | head -100
+    No warnings or errors were found.
+
+    <Document>
+      <BkToCstmrStmt>
+        <BankToCustomerStatementV11>
+          <GrpHdr>
+            <GroupHeader81>
+              <MsgId>ZNzfKC0iHz4POPl0Ak</MsgId>
+              <CreDtTm>Generated value of ISODateTime</CreDtTm>
+              <MsgRcpt>
+                <PartyIdentification135>
+                  <Nm>
+                  2XbgTc3hGcsww6LGS7YKeZakjYbCbE4MI7osO0eWrSoQqIopiMwAMfSxZLiwUfUQuMYkrSIiF7
+                  0ncMF5qFr6JiF9FPEoeLqVuhHCOA6nff</Nm>
+                  <PstlAdr>
+                    <PostalAddress24>
+                      <AdrTp>
+                        <AddressType3Choice>
+                          <Prtry>
+                            <GenericIdentification30>
+                              <Id>Lxum</Id>
+                              <Issr>sQ6BvS4hRiLtr31c02</Issr>
+                              <SchmeNm>0duPO</SchmeNm>
+                            </GenericIdentification30>
+                          </Prtry>
+                        </AddressType3Choice>
+                      </AdrTp>
+                      <Dept>Pi90SVfGJmVcZ76YFeOeQYDO
+                      iDtTjajNXaTcwzElV3Cf</Dept>
+                      <SubDept>CHaW1pjkULJtSYE2xf</SubDept>
+                      <StrtNm>mb6GiNREVOh1qMW4o6aJ
+                      kV6sQcRf5Ll80srRvTdBaMps KmlGCO8ItQiE2x</StrtNm>
+                      <BldgNb>MJyofU0O6cMcK</BldgNb>
+                      <BldgNm>XeomCPf7Fr8IOa4M
+                      j3pxFNgjLOhnkoWc</BldgNm>
+                      <Flr>4w6lRHPJA8cUKHJ0NPl5jQu8PrEErh4fg3eU</Flr>
+                      <PstBx>gtzZwDt</PstBx>
+                      <Room>Nk1psE20gcav9njX</Room>
+                      <PstCd>5F3qMi2 b</PstCd>
+                      <TwnNm>Zo6fVdBkgLm3hmGL62l XNIzP</TwnNm>
+                      <TwnLctnNm>kfSjIFFi</TwnLctnNm>
+                      <DstrctNm>G0ShpUiWjIq</DstrctNm>
+                      <CtrySubDvsn>
+                      KtEBV7QXKckmTiMzRQhVjUrM</CtrySubDvsn>
+                      <Ctry>SZ</Ctry>
+                      <AdrLine>jrBKfRxl5hM8QDqHc8c2QMghhbwuf</AdrLine>
+                    </PostalAddress24>
+                  </PstlAdr>
+                  <Id>
+                    <Party38Choice>
+                      <OrgId>
+                        <OrganisationIdentification29>
+                          <AnyBIC>O5N1LABZ(UWH)</AnyBIC>
+                          <LEI>HTNES9FFMT1ALBFVOF39</LEI>
+                          <Othr>
+                            <GenericOrganisationIdentification1>
+                              <Id>6tCuP7kY7aBPavQf8</Id>
+                              <SchmeNm>
+                                <OrganisationIdentificationSchemeName1Choice>
+
+                                  <Prtry>T66m8UcxgVRnoXgHP75</Prtry>
+                                </OrganisationIdentificationSchemeName1Choice>
+                              </SchmeNm>
+                              <Issr>61fDvewPRtA zMoc2wy</Issr>
+                            </GenericOrganisationIdentification1>
+                          </Othr>
+                        </OrganisationIdentification29>
+                      </OrgId>
+                    </Party38Choice>
+                  </Id>
+                  <CtryOfRes>SB</CtryOfRes>
+                  <CtctDtls>
+                    <Contact4>
+                      <NmPrfx>
+                        <NamePrefix2Code>MIKS</NamePrefix2Code>
+                      </NmPrfx>
+                      <Nm>B7 YIgdelxQCRG03IFk</Nm>
+                      <PhneNb>+50-152(((36(</PhneNb>
+                      <MobNb>+770-7)+3655417-2+5)80+5871+19+5</MobNb>
+                      <FaxNb>+60-44)85+8</FaxNb>
+                      <EmailAdr>GSpZhkNHYapKU0RpOziCdEVhmu4YZGmZm5
+                      3z9bNYaGl0RldXN3o6crv7ObzyYpbObpbAhIGXjr3TYVI8BqTzI08gp2Q22qbSXTHf0FDXRYbLHQk
+                      MJkoQNxdhJaRVAMtspfQX7bhL73gWG1N
+                      fclgEeZYSVbPmEBsBE
+                      3VFVF0VeIHPUzB6AeKElzrHPMwD8PcPYeOYgjxxUkH9fjTa0AQp7gGJTdrc
+                      3L nFIN6t40HJnj8wO7H5bcBd5XIqLY3tDne
+                      olfH6OojhFoRMoUYy32SwFYWeVWcASlPDuwm
+                      T7CUyIrUEwJqCyydMnJUy2ArL9i7oC7y0hlAbwK16zO5ZI
+                      Brv6pVxzhyaaGYs3sVw1wgi6e3PldMgSk6xB0ffThnqqQ3QTOlghZwYl1pbPuNKBOxFwv7phlfAeMFlyELTIamqigODjaRkGfwOcoBbqCLXv2rW0cSzzK2aqweyEOexjGKotn9wVdfImBKRNC58B
+                      KUgzYeRIHqt0wwKmXneWyEbK5UoBEqRqknaqndizQzXbxn1bv7asL1IPvRY7PIRpvsypRyvLCZiIjZmb7y</EmailAdr>
+                      <EmailPurp>NLzD</EmailPurp>
+                      <JobTitl>GW1fXtixq</JobTitl>
+                      <Rspnsblty>pFqAs3 uwoih6bkA0D
+                      5QtDbqJ1</Rspnsblty>
+                      <Dept>av2Hz23G8fAQt744OCYhYsrAXpuXvGc
+                      qhiaqA</Dept>
+                      <Othr>
+                        <OtherContact1>
+                          <ChanlTp>rcS</ChanlTp>
+                          <Id>
+                          t0ySYwswpAZnqlNsQ7sB6aYxGoB1pj0GqHA4tIxYOSvMOpAMVQ5rXuFM</Id>
+                        </OtherContact1>
+
+Tested against the following XSD files:
+
+    #> ls -1 ISO20022/*.xsd
+    ISO20022/camt.053.001.11.xsd
+    ISO20022/camt.054.001.11.xsd
+    ISO20022/pacs.002.001.13.xsd
+    ISO20022/pacs.003.001.10.xsd
+    ISO20022/pacs.004.001.12.xsd
+    ISO20022/pacs.007.001.12.xsd
+    ISO20022/pacs.008.001.11.xsd

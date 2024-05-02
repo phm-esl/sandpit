@@ -107,6 +107,12 @@ when is_binary(Type_name), is_map(Schema) ->
 generate_from_node(Node,Schema) ->
   Name = maps:get(name,Node),
   case Node of
+    #{ type := string, minLength := Min, maxLength := Max}
+    when is_integer(Min), is_integer(Max) ->
+      Bmin = integer_to_binary(Min),
+      Bmax = integer_to_binary(Max),
+      generate_pattern(
+        <<"[ 0-9A-Za-z]{", Bmin/binary, $,, Bmax/binary, $}>> );
     #{ pattern := Pattern } -> generate_pattern(Pattern);
     #{ enumeration := Enum } ->
       #element{
@@ -138,7 +144,9 @@ generate_from_node(Node,Schema) ->
         content = [generate_from_schema(Type,Schema)] };
     #{ type := date } -> generate_TODO(Name);
     #{ type := dateTime } -> generate_TODO(Name);
+    #{ type := time } -> generate_TODO(Name);
     #{ type := year } -> generate_TODO(Name);
+    #{ type := yearMonth } -> generate_TODO(Name);
     #{ type := boolean } -> generate_boolean();
     #{ type := base64 } -> generate_TODO(Name);
     #{ type := decimal } -> generate_TODO(Name) end.
@@ -153,13 +161,22 @@ generate_any_sequence() ->
   [<<"Generated value of any sequence ...">>].
 
 generate_pattern(Pattern) ->
-  [<< "Generated pattern ", Pattern/binary >>].
+  [parse_pattern(Pattern)].
 
 parse_pattern(Pattern) ->
-  erlang:list_to_binary(generate(parse_pattern(0,Pattern,[]),[])).
+  try erlang:list_to_binary(generate(parse_pattern(0,Pattern,[]),[]))
+  catch What:Why:Where ->
+    throw(
+    #{ pattern => Pattern,
+       what => What,
+       why => Why,
+       where => Where}) end.
 
 generate([],Out) -> Out;
-generate([Gen|Rest],Out) -> generate(Rest,[Gen()|Out]).
+generate([Gen|Rest],Out) when is_function(Gen) ->
+  generate(Rest,[Gen()|Out]);
+generate([Char|Rest],Out) when is_integer(Char)  ->
+  generate(Rest,[Char|Out]).
 
 parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
   case Pattern of
@@ -324,10 +341,12 @@ simpleType(Name,[#element{ name = <<"restriction">> } = Element]) ->
     attributes = Attr,
     content = Content } = Element,
   case trim_name(maps:get(<< "base" >>, Attr)) of
-    << "date"     >> -> #{ type => date, name => Name };
-    << "dateTime" >> -> #{ type => dateTime, name => Name };
-    << "gYear"    >> -> #{ type => year, name => Name };
-    << "boolean"  >> -> #{ type => boolean, name => Name };
+    << "date"       >> -> #{ type => date, name => Name };
+    << "dateTime"   >> -> #{ type => dateTime, name => Name };
+    << "time"       >> -> #{ type => time, name => Name };
+    << "gYear"      >> -> #{ type => year, name => Name };
+    << "gYearMonth" >> -> #{ type => yearMonth, name => Name };
+    << "boolean"    >> -> #{ type => boolean, name => Name };
     << "base64Binary" >> ->
       base64Binary(Content,#{ type => base64, name => Name });
     << "decimal" >> ->

@@ -126,8 +126,6 @@ generate_from_node(Node,Schema) ->
       #element{
         name = Name,
         content = [pick_random(Enum)] };
-    #{ type := string } ->
-       generate_TODO(<<"string ", Name/binary >>);
     #{ choice := Choice } ->
       #element{
         name = Name,
@@ -174,12 +172,6 @@ generate_from_node(Node,Schema) ->
                    Right/binary,
                    "}" >>,
       parse_pattern(Pattern) end.
-
-%%%
-%%%   Following generators are NOT adequate
-%%%
-generate_TODO(Name) ->
-  [<< "Generated value of ",  Name/binary >>].
 
 %%%
 %%%   Following generators are adequate:
@@ -339,37 +331,39 @@ generate_dateTime() ->
   Now = erlang:timestamp(),
   {{Yr,Mo,Dy},{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
   erlang:list_to_binary(
-      [pad(4,Yr),$-,pad(2,Mo),$-,pad(2,Dy),$T,
-       pad(2,Hr),$:,pad(2,Mn),$:,pad(2,Sc) ]).
+      [pad4(Yr),$-,pad2(Mo),$-,pad2(Dy),$T,
+       pad2(Hr),$:,pad2(Mn),$:,pad2(Sc) ]).
 
 generate_date() ->
   Now = erlang:timestamp(),
   {{Yr,Mo,Dy},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad(4,Yr),$-,pad(2,Mo),$-,pad(2,Dy) ]).
+  erlang:list_to_binary([ pad4(Yr),$-,pad2(Mo),$-,pad2(Dy) ]).
 
 generate_time() ->
   Now = erlang:timestamp(),
   {_,{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad(2,Hr),$:,pad(2,Mn),$:,pad(2,Sc) ]).
+  erlang:list_to_binary([ pad2(Hr),$:,pad2(Mn),$:,pad2(Sc) ]).
 
 generate_year() ->
   Now = erlang:timestamp(),
   {{Yr,_,_},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad(4,Yr) ]).
+  erlang:list_to_binary([ pad4(Yr) ]).
 
 generate_yearMonth() ->
   Now = erlang:timestamp(),
   {{Yr,Mo,_},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad(4,Yr),$-,pad(2,Mo) ]).
+  erlang:list_to_binary([ pad4(Yr),$-,pad2(Mo) ]).
 
 
-pad(W,N) when is_integer(N) ->
-  Zeros = << "000000" >>,
-  Bin = erlang:integer_to_binary(N),
-  case W =< byte_size(Zeros) andalso W - byte_size(Bin)
-    of Neg when Neg < 0 -> Bin
-     ; Pad when Pad =< byte_size(Zeros)
-       -> << Zeros:Pad/binary, Bin/binary >> end.
+
+pad2(N) ->
+  if N >= 10-> erlang:integer_to_binary(N);
+     0 =< N, N < 10 -> [ $0,erlang:integer_to_binary(N) ] end.
+
+pad4(N) ->
+  if N >= 1000 -> erlang:integer_to_binary(N);
+     N >= 100 -> [ $0, erlang:integer_to_binary(N)];
+     true -> [ "00", pad2(N)] end.
 
 
 
@@ -384,10 +378,7 @@ generate_base64(Min,Max) ->
   base64:encode(rand:bytes(Len)).
 
 generate_boolean() ->
-  Bool = case rand:uniform(2) of
-    1 -> <<"FALSE">>;
-    2 -> <<"TRUE">> end,
-  [Bool].
+  element(rand:uniform(2), {[<<"FALSE">>], [<<"TRUE">>]}).
 
 generate_sequence(Sequence,Schema) ->
   Each = fun ({element,I},O) ->

@@ -10,8 +10,7 @@
  , document/1 ] ).
 
 -export(
- [ parse_pattern/1
- , test/0
+ [ test/0
  , test_fragments/0 ] ).
 
 -define(space,$\s).
@@ -48,10 +47,15 @@
     attributes = #{},
     content = [] }).
 
--define(dbg(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+% TODO Either delete dbg macro, or replace io with logger.
+%-define(dbg(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
 
-encode(In) -> erlang:list_to_binary(encode_elements(In)).
+encode(In) -> to_binary(encode_elements(In)).
+
+to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
+to_binary(Bin) when is_binary(Bin) -> Bin;
+to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
 
 encode_elements([]) -> [];
 encode_elements([Head|Tail]) -> [encode_elements(Head)|encode_elements(Tail)];
@@ -117,15 +121,15 @@ generate_from_node(Node,Schema) ->
   case Node of
     #{ type := string, minLength := Min, maxLength := Max}
     when is_integer(Min), is_integer(Max) ->
-      Bmin = integer_to_binary(Min),
-      Bmax = integer_to_binary(Max),
-      generate_pattern(
+      Bmin = to_binary(Min),
+      Bmax = to_binary(Max),
+      make_value:from_regexp(
         <<"[ 0-9A-Za-z]{", Bmin/binary, $,, Bmax/binary, $}>> );
-    #{ pattern := Pattern } -> generate_pattern(Pattern);
+    #{ pattern := Pattern } -> make_value:from_regexp(Pattern);
     #{ enumeration := Enum } ->
       #element{
         name = Name,
-        content = [pick_random(Enum)] };
+        content = [make_value:pick_random(Enum)] };
     #{ choice := Choice } ->
       #element{
         name = Name,
@@ -135,7 +139,7 @@ generate_from_node(Node,Schema) ->
       % They said "sequence of any". Might need <[CDATA[...]]> here?
       %
       Pattern = <<"[ -~]{0,999}">>,
-      Content = parse_pattern(Pattern),
+      Content = make_value:from_regexp(Pattern),
       #element{
         name = Name,
         content = << "<![CDATA[", Content/binary, "]]>" >> };
@@ -152,26 +156,26 @@ generate_from_node(Node,Schema) ->
       #element{
         name = Name,
         content = [generate_from_schema(Type,Schema)] };
-    #{ type := date } -> generate_date();
-    #{ type := dateTime } -> generate_dateTime();
-    #{ type := time } -> generate_time();
-    #{ type := year } -> generate_year();
-    #{ type := yearMonth } -> generate_yearMonth();
-    #{ type := boolean } -> generate_boolean();
+    #{ type := date } -> make_value:date();
+    #{ type := dateTime } -> make_value:date_time();
+    #{ type := time } -> make_value:time();
+    #{ type := year } -> make_value:year();
+    #{ type := yearMonth } -> make_value:year_month();
+    #{ type := boolean } -> make_value:boolean();
     #{ type := base64, minLength := Min, maxLength := Max } ->
-      generate_base64(Min,Max);
+      make_value:base64(Min,Max);
     #{ type := decimal, totalDigits := Total, fractionDigits := Fract } ->
       %
       % A bit hacky, I confess (-:
       %
-      Left = integer_to_binary(Total - Fract),
-      Right = integer_to_binary(Fract),
+      Left = to_binary(Total - Fract),
+      Right = to_binary(Fract),
       Pattern = << "([1-9][0-9]{0,",
                    Left/binary,
                    "}).[0-9]{0,",
                    Right/binary,
                    "}" >>,
-      parse_pattern(Pattern) end.
+      make_value:from_regexp(Pattern) end.
 
 %%%
 %%%   Following generators are adequate:
@@ -186,200 +190,6 @@ gen_each_attr({attribute,Attr},Schema,Out) ->
   Value = generate_from_schema(Type,Schema),
   Out#{ Name => Value }.
 
-
-generate_pattern(Pattern) ->
-  [parse_pattern(Pattern)].
-
-parse_pattern(Pattern) ->
-  try
-    {_,Generators} = parse_pattern(0,Pattern,[]),
-    erlang:list_to_binary(generate(Generators))
-  catch What:Why:Where ->
-    throw(
-    #{ pattern => Pattern,
-       what => What,
-       why => Why,
-       where => Where}) end.
-
-generate(In) -> generate(In,[]).
-
-generate([],Out) -> Out;
-generate([Bin|Rest],Out) when is_binary(Bin) ->
-  generate(Rest,[Bin|Out]);
-generate([Gen|Rest],Out) when is_function(Gen) ->
-  generate(Rest,[Gen()|Out]);
-generate([Alternation|Rest],Out) when is_list(Alternation) ->
-  Gen = pick_random(Alternation),
-  generate([Gen|Rest],Out).
-
-
-parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
-  case Pattern of
-    << _:Pos/binary, $|, _/binary >> -> % alternation
-      gen_alternation(Pos + 1,Pattern,Out);
-
-    << _:Pos/binary, $(, _/binary >> -> % grouping begin
-      {End,Gen} = gen_group(Pos + 1,Pattern),
-      parse_pattern(End,Pattern,[Gen|Out]);
-    << _:Pos/binary, $), _/binary >> -> % grouping finish
-      {Pos + 1,Out};
-
-    << _:Pos/binary, $[, _/binary >> ->
-      {End,Gen} = gen_range(Pos + 1,Pattern),
-      parse_pattern(End,Pattern,[Gen|Out]);
-    << _:Pos/binary, ${, _/binary >> ->
-      {End,Gen} = gen_repeat(Pos + 1,Pattern,hd(Out)),
-      parse_pattern(End,Pattern,[Gen|tl(Out)]);
-
-%    << _:Pos/binary, X, _/binary >> when X =:= $+ ; X =:= $* ->
-%      throw(unbounded_repetition_not_implemented);
-
-    << _:Pos/binary, _/binary >> ->
-      {End,Gen} = gen_literal(Pos,Pattern),
-      parse_pattern(End,Pattern,[Gen|Out]) end;
-parse_pattern(Pos,_,Out) -> {Pos,Out}.
-
-
-
-gen_alternation(Pos,Pattern,[Head|Tail]) ->
-  {End,Gen} = parse_pattern(Pos,Pattern,[]),
-  if is_list(Head) -> {End,[[Gen|Head]|Tail]};
-     is_binary(Head) -> {End,[[Gen,Head]|Tail]};
-     is_function(Head) -> {End,[[Gen,Head]|Tail]} end.
-
-
-gen_literal(Pos,Pattern) -> gen_literal(Pos,0,Pattern).
-
-gen_literal(Pos,Len,Pattern) ->
-  N = Pos + Len,
-  if N < size(Pattern) ->
-    case Pattern of
-      << _:N/binary, $\\, _/binary >> ->
-          gen_literal(Pos,Len + 2,Pattern);
-      << _:N/binary, X, _/binary >> ->
-        if X =:= ${ ; X =:= $} ;
-           X =:= $( ; X =:= $) ;
-           X =:= $[ ; X =:= $] ;
-%           X =:= $+ ; %%%% one-or-more repetition
-%           X =:= $* ; %%%% zero-or-more repetiton
-           X =:= $| ->
-             Part = binary:part(Pattern,Pos,Len),
-            {Pos + Len,Part};
-           N < size(Pattern) -> gen_literal(Pos,Len + 1,Pattern) end end;
-    true -> Part = binary:part(Pattern,Pos,Len),
-            {Pos + Len,Part} end.
-
-
-gen_group(Pos,Pattern) ->
-  {End,Gen} = parse_pattern(Pos,Pattern,[]),
-  {End,fun () -> generate(Gen) end}.
-
-gen_range(Pos,Pattern) -> gen_range(Pos,Pattern,[]).
-
-gen_range(Pos,Pattern,[B,$-,A|Out]) ->
-  gen_range(Pos,Pattern,gen_seq(A,B,Out));
-
-gen_range(Pos,Pattern,Out) when Pos < size(Pattern) ->
-  case Pattern of
-    << _:Pos/binary, $\\, A, _/binary >> ->
-      gen_range(Pos + 2,Pattern,[A|Out]);
-    << _:Pos/binary, $], _/binary >> ->
-      {Pos + 1, fun () -> pick_random(Out) end};
-    << _:Pos/binary, C, _/binary >> ->
-      gen_range(Pos + 1, Pattern,[C|Out]) end.
-
-gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
-gen_seq(B,B,Out) -> [B|Out].
-
-
-gen_repeat(Pos,Pattern,Gen) when is_function(Gen) ->
-  gen_repeat(Pos,0,Pattern,Gen).
-
-gen_repeat(Pos,N,Pattern,Gen)
-when Pos < size(Pattern), is_function(Gen) ->
-  case Pattern of
-    << _:Pos/binary, $}, _/binary >> ->
-      {Pos + 1, gen_repeat_fun(N,Gen)};
-    << _:Pos/binary, $,, _/binary >> ->
-      gen_repeat_min_max(Pos + 1,N,0,Pattern,Gen);
-    << _:Pos/binary, X, _/binary >> when $0 =< X, X =< $9 ->
-      gen_repeat(Pos + 1,10 * N + X - $0,Pattern,Gen) end.
-
-gen_repeat_min_max(Pos,Min,Max,Pattern,Gen) when Pos < size(Pattern) ->
-  case Pattern of
-    << _:Pos/binary, $}, _/binary >> ->
-      {Pos + 1, gen_repeat_fun(Min,Max,Gen)};
-    << _:Pos/binary, X, _/binary >> when $0 =< X, X =< $9 ->
-      gen_repeat_min_max(Pos + 1,Min,10 * Max + X - $0,Pattern,Gen) end.
-
-
-gen_repeat_fun(N,Gen) ->
-  fun () -> (repeat(Gen))(N) end.
-
-gen_repeat_fun(N,N,Gen) ->
-  fun () -> (repeat(Gen))(N) end;
-gen_repeat_fun(Min,Max,Gen) when Min < Max ->
-  fun () -> (repeat(Gen))(Min + rand:uniform(Max - Min)) end.
-
-repeat(Gen) ->
-  fun Fn(0) -> []; Fn(N) when N > 0 -> [Gen()|Fn(N-1)] end.
-
-
-
-
-generate_dateTime() ->
-  Now = erlang:timestamp(),
-  {{Yr,Mo,Dy},{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary(
-      [pad4(Yr),$-,pad2(Mo),$-,pad2(Dy),$T,
-       pad2(Hr),$:,pad2(Mn),$:,pad2(Sc) ]).
-
-generate_date() ->
-  Now = erlang:timestamp(),
-  {{Yr,Mo,Dy},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad4(Yr),$-,pad2(Mo),$-,pad2(Dy) ]).
-
-generate_time() ->
-  Now = erlang:timestamp(),
-  {_,{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad2(Hr),$:,pad2(Mn),$:,pad2(Sc) ]).
-
-generate_year() ->
-  Now = erlang:timestamp(),
-  {{Yr,_,_},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad4(Yr) ]).
-
-generate_yearMonth() ->
-  Now = erlang:timestamp(),
-  {{Yr,Mo,_},_} = calendar:now_to_universal_time(Now),
-  erlang:list_to_binary([ pad4(Yr),$-,pad2(Mo) ]).
-
-
-
-pad2(N) ->
-  if N >= 10-> erlang:integer_to_binary(N);
-     0 =< N, N < 10 -> [ $0,erlang:integer_to_binary(N) ] end.
-
-pad4(N) ->
-  if N >= 1000 -> erlang:integer_to_binary(N);
-     N >= 100 -> [ $0, erlang:integer_to_binary(N)];
-     true -> [ "00", pad2(N)] end.
-
-
-
-
-
-
-generate_base64(Min,Max) ->
-  % NOTE The encoded output base64:encode
-  %      is 33% larger than input binary,
-  %      hence scale input by 2/3.
-  Len = 2 * (Min + rand:uniform(Max - Min)) div 3,
-  base64:encode(rand:bytes(Len)).
-
-generate_boolean() ->
-  element(rand:uniform(2), {[<<"FALSE">>], [<<"TRUE">>]}).
-
 generate_sequence(Sequence,Schema) ->
   Each = fun ({element,I},O) ->
     Element = generate_from_node(I,Schema),
@@ -387,20 +197,15 @@ generate_sequence(Sequence,Schema) ->
   lists:reverse(lists:foldl(Each,[],Sequence)).
 
 generate_choice(Choice,Schema) ->
-  {element,Pick} = pick_random(Choice),
+  {element,Pick} = make_value:pick_random(Choice),
   generate_from_node(Pick,Schema).
-
-pick_random(Choice) ->
-  Length = length(Choice),
-  N = rand:uniform(Length),
-  lists:nth(N,Choice).
 
 %%%
 %%%   Extract the raw document text without the markup decoration.
 %%%
 raw_text(In) ->
   white_space(
-    erlang:list_to_binary(raw_each(In)),
+    to_binary(raw_each(In)),
     fun (I) -> I end ).
 
 raw_each(#element{ content = Content }) -> raw_each(Content);

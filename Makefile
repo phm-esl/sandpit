@@ -75,6 +75,7 @@ all: $$(All_targets)
 .PHONY: clean
 clean:
 	rm -r ./*/ebin/
+	rm ./*/src/*~
 
 ?%:
 	$(info Values assigned to $(*))

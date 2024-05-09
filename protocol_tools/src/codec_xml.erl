@@ -42,8 +42,7 @@
     attributes = #{},
     content = [] }).
 
-% TODO Either delete dbg macro, or replace io with logger.
-%-define(dbg(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
 
 encode(In) -> to_binary(encode_elements(In)).
@@ -365,8 +364,31 @@ white_space(In,Done) ->
          Sp =:= ?tab -> white_space(Tail,Done);
     _ -> Done(In) end.
 
+%%%
+%%%   API hook: if the trimmed element Elem_name matches an
+%%%   existing Erlang atom, temporarily pass control back to
+%%%   the calling function to offer the element Contents for
+%%%   examination, and a continuation.  When examination
+%%%   concludes, decoding continues by calling the continuation
+%%%   function closure.  An existing atom can originate from
+%%%   configuration data loaded into the BEAM that specify
+%%%   interesting elements, and what to do with the Contents of
+%%%   said elements.
+%%%
+result(In,Out,Done) when is_function(Done) ->
+  case Out of
+   #element{ name = Elem_name, content = Content } ->
+    case to_atom(trim(Elem_name)) of
+      [Atom] -> { Atom, Content, fun () -> Done(In,Out) end };
+      [] -> Done(In,Out) end;
+   _ -> Done(In,Out) end.
 
-result(In,Out,Done) when is_function(Done) -> Done(In,Out).
+trim(Bin) when is_binary(Bin) ->
+  lists:last(binary:split(Bin,<<$:>>,[global])).
+
+to_atom(Bin) when is_binary(Bin) ->
+  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
+  catch error:badarg -> [] end.
 
 
 test_cases() ->
@@ -503,8 +525,13 @@ test(Tests) ->
   [{In,Good,decode(In)} || {In,Good} <- Failures ].
 
 filter({In,Good}) ->
-  Out = decode(In),
+  Out = loop(decode(In)),
   Out /= Good.
+
+loop({Atom,Content,Fn}) when is_function(Fn) ->
+  ?log("Atom = ~p.~n\tContent = ~p.~n",[Atom,Content]),
+  loop(Fn());
+loop(Out) -> Out.
 
 test_fragments() ->
   Tests = test_cases(),
@@ -520,5 +547,5 @@ test_frag({Bin,Good}=Test,Pos) ->
       Fn = decode(Head),
       Pass = is_function(Fn) andalso Good =:= Fn(Tail) orelse Good =:= Fn,
       if Pass -> test_frag(Test,Pos + 1);
-         not is_function(Fn) -> io:format("Fn = ~p.~n",[Fn]), false;
-         true -> io:format("Tail = ~p.~n",[Tail]), false end end.
+         not is_function(Fn) -> ?log("Fn = ~p.~n",[Fn]), false;
+         true -> ?log("Tail = ~p.~n",[Tail]), false end end.

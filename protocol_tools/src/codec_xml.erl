@@ -250,7 +250,9 @@ reference(In,Pos,Type,Done) ->
 
 start_tag_name(In,Done) when is_function(Done) ->
   Next = fun (Tail,Elem_name) -> attr_name(Tail,Elem_name,#{},Done) end,
-  token(In,0,Next).
+  % TODO Hook: {start_tag, Elem_name, Next}
+  Hook = fun (I,O) -> hook(I,O,Next) end,
+  token(In,0,Hook).
 
 attr_name(In,Elem_name,Attributes,Done) ->
   Next = fun (Tail,Attr_name) ->
@@ -264,7 +266,8 @@ attr_name(In,Elem_name,Attributes,Done) ->
         name = Elem_name,
         attributes = Attributes,
         content = empty },
-      result(Tail,Out,Done);
+      % TODO {empty_tag, Elem_name, Out, Next}
+      hook(Tail,Out,Done);
     << ?greater_than, Tail/binary >> ->
       Out = #element{
         name = Elem_name,
@@ -332,8 +335,9 @@ end_tag(In,Out,Done) ->
         Content = Out#element.content,
         Update = Out#element{ content = lists:reverse(Content) },
         Next = fun
-          Fn(<< ?greater_than, T/binary >>) -> result(T,Update,Done);
+          Fn(<< ?greater_than, T/binary >>) -> hook(T,Update,Done);
           Fn(<< >>) -> fun (More) -> Fn(More) end end,
+        % TODO Hook: {end_tag, Elem_name, Content, Next}}
         white_space(Tail,Next);
       _ when byte_size(Tag) < Pos ->
         fun (More) -> Resume(<< Tag/binary, More/binary >>) end end end,
@@ -364,6 +368,21 @@ white_space(In,Done) ->
          Sp =:= ?tab -> white_space(Tail,Done);
     _ -> Done(In) end.
 
+
+hook(In,Out,Done) when is_function(Done) ->
+  Next = fun () -> Done(In,Out) end,
+  case Out of
+   Token when is_binary(Token) ->
+     case to_atom(trim(Token)) of
+       [Atom] -> { Atom, token, Next };
+       [] -> Next() end;
+   #element{ name = Elem_name, content = Content } ->
+     case to_atom(trim(Elem_name)) of
+       [Atom] -> { Atom, Content, Next };
+       [] -> Next() end;
+   _ -> Next() end.
+
+
 %%%
 %%%   API hook: if the trimmed element Elem_name matches an
 %%%   existing Erlang atom, temporarily pass control back to
@@ -375,13 +394,7 @@ white_space(In,Done) ->
 %%%   interesting elements, and what to do with the Contents of
 %%%   said elements.
 %%%
-result(In,Out,Done) when is_function(Done) ->
-  case Out of
-   #element{ name = Elem_name, content = Content } ->
-    case to_atom(trim(Elem_name)) of
-      [Atom] -> { Atom, Content, fun () -> Done(In,Out) end };
-      [] -> Done(In,Out) end;
-   _ -> Done(In,Out) end.
+result(In,Out,Done) when is_function(Done) -> Done(In,Out).
 
 trim(Bin) when is_binary(Bin) ->
   lists:last(binary:split(Bin,<<$:>>,[global])).
@@ -522,16 +535,50 @@ test() ->
 test(Tests) ->
   Filter = fun filter/1,
   Failures = lists:filter(Filter,Tests),
-  [{In,Good,decode(In)} || {In,Good} <- Failures ].
+  [{In,Good,test_decode(In)} || {In,Good} <- Failures ].
 
 filter({In,Good}) ->
-  Out = loop(decode(In)),
+  Out = test_decode(In),
   Out /= Good.
 
-loop({Atom,Content,Fn}) when is_function(Fn) ->
-  ?log("Atom = ~p.~n\tContent = ~p.~n",[Atom,Content]),
-  loop(Fn());
-loop(Out) -> Out.
+test_decode(In) ->
+  X = {'Envelope',[
+        {'Header',[ ]},
+        {'Body',[
+          {trigger,[
+            {attribute,[ ]} ]} ]} ]},
+
+  Elements = extraction_paths(X),
+
+  Elements = #{
+    ['Header','Envelope'] => [],
+    [attribute,trigger,'Body','Envelope'] => [] },
+  loop(decode(In),[],Elements).
+
+
+extraction_paths(Paths) ->
+  lists:foldl(
+    fun (I,O) -> O#{ lists:reverse(I) => [] } end,
+    #{},
+    unroll(Paths) ).
+
+unroll({Atom,[]}) -> [[Atom]];
+unroll({Atom,List}) -> [ [Atom|U] || L <- List, U <- unroll(L) ].
+
+
+
+loop({Atom,Content,Fn},In,Out) when is_function(Fn) ->
+  if Content =:= token ->
+       loop(Fn(),[Atom|In],Out);
+     is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
+       loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
+     hd(In) =:= Atom ->
+       loop(Fn(),tl(In),Out);
+     true ->
+       loop(Fn(),In,Out) end;
+loop(Decoded,[],Out) ->
+  ?log("Out = ~p.~n",[Out]),
+  Decoded.
 
 test_fragments() ->
   Tests = test_cases(),
@@ -544,7 +591,7 @@ test_frag({Bin,Good}=Test,Pos) ->
   case Bin of
     << _:Pos/binary >> -> true;
     << Head:Pos/binary, Tail/binary >> ->
-      Fn = decode(Head),
+      Fn = test_decode(Head),
       Pass = is_function(Fn) andalso Good =:= Fn(Tail) orelse Good =:= Fn,
       if Pass -> test_frag(Test,Pos + 1);
          not is_function(Fn) -> ?log("Fn = ~p.~n",[Fn]), false;

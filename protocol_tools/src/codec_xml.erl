@@ -250,7 +250,6 @@ reference(In,Pos,Type,Done) ->
 
 start_tag_name(In,Done) when is_function(Done) ->
   Next = fun (Tail,Elem_name) -> attr_name(Tail,Elem_name,#{},Done) end,
-  % TODO Hook: {start_tag, Elem_name, Next}
   Hook = fun (I,O) -> hook(I,O,Next) end,
   token(In,0,Hook).
 
@@ -266,7 +265,6 @@ attr_name(In,Elem_name,Attributes,Done) ->
         name = Elem_name,
         attributes = Attributes,
         content = empty },
-      % TODO {empty_tag, Elem_name, Out, Next}
       hook(Tail,Out,Done);
     << ?greater_than, Tail/binary >> ->
       Out = #element{
@@ -337,7 +335,6 @@ end_tag(In,Out,Done) ->
         Next = fun
           Fn(<< ?greater_than, T/binary >>) -> hook(T,Update,Done);
           Fn(<< >>) -> fun (More) -> Fn(More) end end,
-        % TODO Hook: {end_tag, Elem_name, Content, Next}}
         white_space(Tail,Next);
       _ when byte_size(Tag) < Pos ->
         fun (More) -> Resume(<< Tag/binary, More/binary >>) end end end,

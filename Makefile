@@ -26,7 +26,7 @@ bullet_list = \
 
 
 
-Module_paths := $(wildcard ./*/src/*.erl)
+Module_paths := $(wildcard ./*/src/*.erl) $(wildcard ./*/test/*.erl)
 Module_files := $(notdir $(Module_paths))
 Module_names := $(sort $(Module_files:%.erl=%))
 

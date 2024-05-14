@@ -1006,3 +1006,103 @@ xs:minInclusive defines an inclusive minimum value.  To be valid, a value
 must be greater than or equal to the value of xs:minInclusive.
 
 [See also](https://www.w3schools.com/XML/schema_facets.asp)
+
+
+# Extraction paths
+
+
+The feature is demonstrated in the unit tests.
+
+During the docoding process, when any element in the XML document happens to
+match by name an entry in the atom-table, the decoder will return with the
+atom found and a continuation closure that will resume decoding the rest.
+See the `codec_xml:hook/1` function.
+
+By itself the `hook` does not extract data in any structured form. This
+requires that the "paths" to data in the XML document are specified as
+configuration data. The path description must contain atoms matching
+elements starting from the top document element through to the element where
+the interesting data is.
+
+There are two forms that the extraction path can be specified, either as a
+nest of maps, or a nest of tuples. See `codec_xml_test:test_decode/1`
+
+```
+  %%
+  %%  Extraction paths as nested maps:
+  %%
+  Y = #{ 'Envelope' =>
+         #{ 'Header' => #{},
+            'Body' =>
+              #{ trigger =>
+                 #{ attribute => #{} } } } },
+
+  Elements = path_utils:extraction_paths(Y),
+
+  %%
+  %%  Extraction paths as nested tuples:
+  %%
+  X = {'Envelope',[
+        {'Header',[ ]},
+        {'Body',[
+          {trigger,[
+            {attribute,[ ]} ]} ]} ]},
+
+  Elements = path_utils:extraction_paths(X),
+```
+
+The above forms are turned "inside-out" to expose each of the paths
+individually, so that the extraction implementation can match them to
+positions within the XML document.
+
+```
+  Elements = #{
+    ['Header','Envelope'] => [],
+    [attribute,trigger,'Body','Envelope'] => [] },
+```
+
+Example output from the unit test:
+
+
+```
+1> codec_xml_test:test().
+=NOTICE REPORT==== 14-May-2024::16:01:21.597837 ===
+loop:187
+	Extracted = #{'Envelope' =>
+                          #{'Body' => #{trigger => #{attribute => []}},
+                            'Header' => []}}.
+
+=NOTICE REPORT==== 14-May-2024::16:01:21.600638 ===
+loop:187
+	Extracted = #{'Envelope' =>
+                          #{'Body' => #{trigger => #{attribute => []}},
+                            'Header' => []}}.
+
+[]
+=NOTICE REPORT==== 14-May-2024::16:01:21.600882 ===
+loop:187
+	Extracted = #{'Envelope' =>
+                       #{'Body' =>
+                          #{trigger =>
+                             #{attribute =>
+                                [[{element,<<"trig:beforeValue">>,#{},
+                                   [<<"Something that exist">>,
+                                    {entity_ref,<<"apos">>},
+                                    <<"d">>]},
+                                  {element,<<"wibble">>,#{},[<<"junk">>]},
+                                  {element,<<"trig:afterValue">>,
+                                   #{<<"abc">> => <<"12&quot;3">>},
+                                   [<<"Value that exists now">>]}],
+                                 [{element,<<"trig:beforeValue">>,#{},
+                                   [{comment,<<" test comment ">>},
+                                    <<"[\"AACY\",\"BBIB\",\"BERRY\"]">>]},
+                                  {element,<<"trig:afterValue">>,#{},
+                                   [<<"[\"AACY\",\"BBIB\",\"BERRY\",\"CLONE\",\"FUP\"]">>]}]]}},
+                         'Header' =>
+                          [[{element,<<"urn:Trans">>,#{},
+                             [{element,<<"urn:serviceName">>,#{},
+                               [<<"UPCC.EE">>]},
+                              {element,<<"urn:msgId">>,#{},[<<"0">>]},
+                              {element,<<"urn:connId">>,#{},[<<"0">>]}]}]]}}.
+
+```

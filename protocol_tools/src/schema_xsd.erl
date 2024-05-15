@@ -13,9 +13,7 @@
     attributes = #{},
     content = [] }).
 
-% TODO Either delete dbg macro, or replace io with logger.
-%-define(dbg(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
-
+-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
 encode(In) -> to_binary(encode_elements(In)).
 
@@ -64,7 +62,7 @@ quote_value(_,_) -> $".
 %%%
 generate_from_XSD_file(File_name,Type_name) ->
   {ok,Bin} = file:read_file(File_name),
-  Document = codec_xml:decode(Bin),
+  Document = decode_xsd(Bin),
   Trimmed = trim_namespace(Document),
   [{element,<<"schema">>,Attrib,_}] = Trimmed,
   Namespace = maps:get(<<"targetNamespace">>,Attrib),
@@ -76,6 +74,21 @@ generate_from_XSD_file(File_name,Type_name) ->
       <<"Document">>,
       Doc_attr#{ <<"xmlns">> => Namespace },
       Content } ].
+
+decode_xsd(Bin) -> decode_xsd_loop(codec_xml:decode(Bin),[],[]).
+
+decode_xsd_loop({Atom,Content,Fn},In,Out) when is_function(Fn) ->
+  %%
+  %%  The data-type names in the atom table will trigger the decode function
+  %%  hook because they match the names in the XSD.  The quick remedy is to
+  %%  immediately call the continuation Fn function.
+  %%
+  if Content =:= token; Content =:= empty; is_list(Content) -> ok;
+     true -> ?log("Atom = ~p.~n\tContent = ~p.~n",[Atom,Content]) end,
+  decode_xsd_loop(Fn(),In,Out);
+decode_xsd_loop(Decoded,[],[]) ->
+  Decoded.
+
 
 generate_from_schema(Type_name,Schema)
 when is_binary(Type_name), is_map(Schema) ->

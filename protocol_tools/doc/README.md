@@ -1106,3 +1106,85 @@ loop:187
                               {element,<<"urn:connId">>,#{},[<<"0">>]}]}]]}}.
 
 ```
+
+
+
+
+# Generation, extraction of message values
+
+
+Example of a PACS.008 message generated with random values, decoded, and the
+specified values extracted to a nested map:
+
+```
+1> flow_pacs_test:test().
+{#{'Document' =>
+   #{'FIToFICstmrCdtTrf' =>
+     #{'GrpHdr' =>
+       #{'MsgId' => [[<<"aaNSqnBMjgiac">>]],
+         'CreDtTm' => [[<<"2024-05-15T13:23:53">>]],
+         'NbOfTxs' => [[<<"934317095042790">>]],
+         'SttlmInf' =>
+             #{'SttlmMtd' =>
+                   [[{element,<<"SettlementMethod1Code">>,#{},
+                         [<<"COVE">>]}]]}},
+       'CdtTrfTxInf' =>
+         #{'PmtId' =>
+             #{'EndToEndId' =>
+                   [[<<"9dTsQitkFZwd4ArfA4S8jy1XNz">>]]},
+           'IntrBkSttlmAmt' =>
+             [[{element,<<"ActiveCurrencyAndAmount">>,
+                   #{<<"Ccy">> => <<"MQN">>},
+                   [<<"3888664762.6434">>]}]],
+           'ChrgBr' =>
+             [[{element,<<"ChargeBearerType1Code">>,#{},
+                   [<<"DEBT">>]}]],
+           'Dbtr' =>
+             #{'Nm' =>
+                 [[<<"Klz9zFETp3zaG46dbnE1wo5jP cciu9mjAqamiMLAmbRmJ92NFaeJzk28f">>],
+                  [<<"qO4esbOueoJgtfj8s6qY4RF1DYz1VtT1PHL12hdgKcCrs3LlQjORcRdGuGT u6tecgYJWJRIJBVxxBhy"...>>],
+                  [<<"lwqCf4Xr9t1b0kDRvduzLxHg0bXUv4SaYrat5GYBa1zfNIiaYvjZuUXWSaagWLLykHGyRFbYPPeL"...>>],
+                  [<<"hQyTY8LVAensK5nyl2ILDQmYi8DKICF5ahDZVYH7VqNflaWaBeqMf9dTbEy5XuLl6FK">>]],
+               'PstlAdr' =>
+                 #{'AdrTp' => #{'Cd' => []},
+                   'StrtNm' =>
+                       [[<<"bNupbTNjz9YHnTVpVacYhyxL5oAizWkTIQzgP87r9CreUbSmAX2QnLupPZj2w01X">>]],
+                   'BldgNb' => [[<<"WKM">>]],
+                   'PstCd' => [[<<"slmnWtvBQkUNA0">>]],
+                   'TwnNm' =>
+                       [[<<"OQSBmuZa6AQ NfziiXmP3CWXe2p6 xTrlH">>]],
+                   'DstrctNm' => [[<<"Snt1ttY">>]]},
+               'CtryOfRes' => [[<<"QK">>]]},
+           'DbtrAgt' =>
+             #{'FinInstnId' =>
+                   #{'BICFI' => [[<<"NV5YHTGR2XV">>]]}},
+           'CdtrAgt' =>
+             #{'FinInstnId' =>
+                   #{'BICFI' => [[<<"WY4OAE9KGO2">>]]}},
+           'Cdtr' =>
+             #{'Nm' =>
+                 [[<<"r9LA4aVVga17aiHnk7mLa5dBforibnJv6DEUnewl8Py 3UU7uXYebH9 PuVExNQ8QGyKQhlWzzfV6zCcOFq8"...>>],
+                  [<<"J1SwYOWEBLaiZY7C7MW3yT6">>]],
+               'PstlAdr' =>
+                 #{'AdrTp' => #{'Cd' => []},
+                   'StrtNm' => [[<<"3gZVoc2b8KFiRLhXk2">>]],
+                   'BldgNb' => [[<<"oZNve1IVLWx">>]],
+                   'PstCd' => [[<<"KuRxH4eyGaYb">>]],
+                   'TwnNm' =>
+                       [[<<"E59FQude6toLYo9Ve09 QxRmoxNv">>]],
+                   'DstrctNm' => [[<<"8o8">>]]}}}}}},
+ [{prolog,<<"xml version=\"1.0\" encoding=\"UTF-8\" ">>},
+  {element,<<"Document">>,
+      #{<<"xmlns">> =>
+            <<"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">>},
+      [{element,<<"FIToFICstmrCdtTrf">>,#{},
+           [{element,<<"FIToFICustomerCreditTransferV11">>,#{},
+                [{element,<<"GrpHdr">>,#{},
+                     [{element,<<"GroupHeader9"...>>,#{},[{...}|...]}]},
+                 {element,<<"CdtTrfTxInf">>,#{},
+                     [{element,<<"CreditTr"...>>,#{},[...]}]},
+                 {element,<<"SplmtryData">>,#{},
+                     [{element,<<"Supp"...>>,#{},...}]}]}]}]}]}
+```
+
+

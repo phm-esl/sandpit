@@ -2,7 +2,8 @@
 
 -export(
  [ encode/1
- , decode/1 ]).
+ , decode/1
+ , decode_hook/1 ]).
 
 -define(space,$\s).
 -define(tab,$\t).
@@ -88,7 +89,13 @@ quote_value(_,_) -> $".
 %%%   https://www.w3.org/TR/xml/
 %%%   All XML documents begin with the prolog. No leading spaces.
 %%%
-decode(<< ?processsing_instruction_start, Tail/binary >>) ->
+decode(Binary) ->
+  loop(decode_hook(Binary)).
+
+loop({_,_,Fn}) when is_function(Fn) -> loop(Fn());
+loop(Decoded) -> Decoded.
+
+decode_hook(<< ?processsing_instruction_start, Tail/binary >>) ->
   process_instruct(Tail,fun prolog/2).
 
 prolog(Bin,{process_instruct,<< "xml", _/binary>>=PI}) ->
@@ -363,35 +370,19 @@ white_space(In,Done) ->
 
 
 %%%
-%%%   API hook: if the trimmed element Elem_name matches an
-%%%   existing Erlang atom, temporarily pass control back to
-%%%   the calling function to offer the element Contents for
+%%%   API hook: temporarily pass control back to the
+%%%   calling function to offer the element Contents for
 %%%   examination, and a continuation.  When examination
-%%%   concludes, decoding continues by calling the continuation
-%%%   function closure.  An existing atom can originate from
-%%%   configuration data loaded into the BEAM that specify
-%%%   interesting elements, and what to do with the Contents of
-%%%   said elements.
+%%%   concludes, decoding continues by calling the
+%%%   continuation function closure.
 %%%
 hook(In,Out,Done) when is_function(Done) ->
   Next = fun () -> Done(In,Out) end,
   case Out of
    Token when is_binary(Token) ->
-     case to_atom(trim(Token)) of
-       [Atom] -> { Atom, token, Next };
-       [] -> Next() end;
+     { Token, token, Next };
    #element{ name = Elem_name, content = Content } ->
-     case to_atom(trim(Elem_name)) of
-       [Atom] -> { Atom, Content, Next };
-       [] -> Next() end;
+     { Elem_name, Content, Next };
    _ -> Next() end.
 
-
 result(In,Out,Done) when is_function(Done) -> Done(In,Out).
-
-trim(Bin) when is_binary(Bin) ->
-  lists:last(binary:split(Bin,<<$:>>,[global])).
-
-to_atom(Bin) when is_binary(Bin) ->
-  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
-  catch error:badarg -> [] end.

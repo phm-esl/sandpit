@@ -613,8 +613,7 @@ Write to `tmp.xml` the XML message generated from the XSD file
       "tmp.xml",
       codec_xml:encode(
         schema_xsd:generate_from_XSD_file(
-          "protocol_tools/priv/camt.053.001.11.xsd",
-          <<"Document">> ) ) ).
+          "protocol_tools/priv/camt.053.001.11.xsd" ) ) ).
 
 The result (fragment):
 
@@ -807,8 +806,7 @@ Extracting the value of the `targetNamespace` from the schema:
       "tmp.xml",
       codec_xml:encode(
         schema_xsd:generate_from_XSD_file(
-          "protocol_tools/priv/pacs.008.001.11.xsd",
-          <<"Document">> ) ) ).
+          "protocol_tools/priv/pacs.008.001.11.xsd" ) ) ).
 
 
 The namespace is now inserted into the Document element:
@@ -1119,72 +1117,89 @@ specified values extracted to a nested map:
 ```
 1> flow_pacs_test:test().
 {#{'Document' =>
-   #{'FIToFICstmrCdtTrf' =>
-     #{'GrpHdr' =>
-       #{'MsgId' => [[<<"aaNSqnBMjgiac">>]],
-         'CreDtTm' => [[<<"2024-05-15T13:23:53">>]],
-         'NbOfTxs' => [[<<"934317095042790">>]],
-         'SttlmInf' =>
-             #{'SttlmMtd' =>
-                   [[{element,<<"SettlementMethod1Code">>,#{},
-                         [<<"COVE">>]}]]}},
-       'CdtTrfTxInf' =>
-         #{'PmtId' =>
-             #{'EndToEndId' =>
-                   [[<<"9dTsQitkFZwd4ArfA4S8jy1XNz">>]]},
-           'IntrBkSttlmAmt' =>
-             [[{element,<<"ActiveCurrencyAndAmount">>,
-                   #{<<"Ccy">> => <<"MQN">>},
-                   [<<"3888664762.6434">>]}]],
-           'ChrgBr' =>
-             [[{element,<<"ChargeBearerType1Code">>,#{},
-                   [<<"DEBT">>]}]],
-           'Dbtr' =>
-             #{'Nm' =>
-                 [[<<"Klz9zFETp3zaG46dbnE1wo5jP cciu9mjAqamiMLAmbRmJ92NFaeJzk28f">>],
-                  [<<"qO4esbOueoJgtfj8s6qY4RF1DYz1VtT1PHL12hdgKcCrs3LlQjORcRdGuGT u6tecgYJWJRIJBVxxBhy"...>>],
-                  [<<"lwqCf4Xr9t1b0kDRvduzLxHg0bXUv4SaYrat5GYBa1zfNIiaYvjZuUXWSaagWLLykHGyRFbYPPeL"...>>],
-                  [<<"hQyTY8LVAensK5nyl2ILDQmYi8DKICF5ahDZVYH7VqNflaWaBeqMf9dTbEy5XuLl6FK">>]],
-               'PstlAdr' =>
-                 #{'AdrTp' => #{'Cd' => []},
-                   'StrtNm' =>
-                       [[<<"bNupbTNjz9YHnTVpVacYhyxL5oAizWkTIQzgP87r9CreUbSmAX2QnLupPZj2w01X">>]],
-                   'BldgNb' => [[<<"WKM">>]],
-                   'PstCd' => [[<<"slmnWtvBQkUNA0">>]],
-                   'TwnNm' =>
-                       [[<<"OQSBmuZa6AQ NfziiXmP3CWXe2p6 xTrlH">>]],
-                   'DstrctNm' => [[<<"Snt1ttY">>]]},
-               'CtryOfRes' => [[<<"QK">>]]},
-           'DbtrAgt' =>
-             #{'FinInstnId' =>
-                   #{'BICFI' => [[<<"NV5YHTGR2XV">>]]}},
-           'CdtrAgt' =>
-             #{'FinInstnId' =>
-                   #{'BICFI' => [[<<"WY4OAE9KGO2">>]]}},
-           'Cdtr' =>
-             #{'Nm' =>
-                 [[<<"r9LA4aVVga17aiHnk7mLa5dBforibnJv6DEUnewl8Py 3UU7uXYebH9 PuVExNQ8QGyKQhlWzzfV6zCcOFq8"...>>],
-                  [<<"J1SwYOWEBLaiZY7C7MW3yT6">>]],
-               'PstlAdr' =>
-                 #{'AdrTp' => #{'Cd' => []},
-                   'StrtNm' => [[<<"3gZVoc2b8KFiRLhXk2">>]],
-                   'BldgNb' => [[<<"oZNve1IVLWx">>]],
-                   'PstCd' => [[<<"KuRxH4eyGaYb">>]],
-                   'TwnNm' =>
-                       [[<<"E59FQude6toLYo9Ve09 QxRmoxNv">>]],
-                   'DstrctNm' => [[<<"8o8">>]]}}}}}},
+     #{'FIToFICstmrCdtTrf' =>
+       #{'GrpHdr' =>
+         #{'MsgId' => [[<<"7yz2 fqaJiMDrS1tG0N0rq">>]],
+           'CreDtTm' => [[<<"2024-05-16T13:08:09">>]],
+           'NbOfTxs' => [[<<"33402068860">>]],
+           'SttlmInf' => #{'SttlmMtd' => [[<<"INDA">>]]}},
+         'CdtTrfTxInf' =>
+           #{'PmtId' => #{'EndToEndId' => [[<<"tS1WHpd0CYk5Cw6E">>]]},
+             'IntrBkSttlmAmt' => [[<<"4828.28005">>]],
+             'ChrgBr' => [[<<"SHAR">>]],
+             'Dbtr' =>
+               #{'Nm' => [[<<"3Ywlp9JWSEIx5EGnWsf">>]],
+                 'PstlAdr' =>
+                     #{'AdrTp' => #{'Cd' => []},
+                       'StrtNm' =>
+                           [[<<"aVAnzHRhGresXP734zBI6PlAtHF1PfB0ecZtejjBnszpg34cnmcsqthkxtfC">>]],
+                       'BldgNb' => [[<<"iiPCqFz5FIz53AU5">>]],
+                       'PstCd' => [[<<"zN">>]],
+                       'TwnNm' => [[<<"OdI ">>]],
+                       'DstrctNm' =>
+                           [[<<"iYs4PNsZS56 lOYnOyj6LWoaUPB6t">>]]},
+                 'CtryOfRes' => [[<<"GZ">>]]},
+             'DbtrAgt' =>
+                 #{'FinInstnId' =>
+                       #{'BICFI' => [[<<"D3V1XXZOZ8R">>]]}},
+             'CdtrAgt' =>
+                 #{'FinInstnId' =>
+                       #{'BICFI' => [[<<"8AR1MQNYXM3">>]]}},
+             'Cdtr' =>
+                 #{'Nm' =>
+                     [[<<"X8MGKZfzej26OgQFDuSG5oWXctW0eAoJf2Mjmf1 1EkCcPKqy8gibpwsoD 2I2C8yEoll88wN1nzVgf">>]],
+                   'PstlAdr' =>
+                     #{'AdrTp' => #{'Cd' => [[<<"BIZZ">>]]},
+                       'StrtNm' =>
+                           [[<<"a8TjvWRtO9JEOD6tHGWiD1yH1nVWbcVJEL4KK7OoT40DA4ezC9M5ZMxCromLkwwls8V">>]],
+                       'BldgNb' => [[<<"omhAr">>]],
+                       'PstCd' => [[<<"RSTMz9E">>]],
+                       'TwnNm' => [[<<"QFS">>]],
+                       'DstrctNm' => [[<<"nXJG6E">>]]}}}}}},
  [{prolog,<<"xml version=\"1.0\" encoding=\"UTF-8\" ">>},
   {element,<<"Document">>,
       #{<<"xmlns">> =>
             <<"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">>},
       [{element,<<"FIToFICstmrCdtTrf">>,#{},
-           [{element,<<"FIToFICustomerCreditTransferV11">>,#{},
-                [{element,<<"GrpHdr">>,#{},
-                     [{element,<<"GroupHeader9"...>>,#{},[{...}|...]}]},
-                 {element,<<"CdtTrfTxInf">>,#{},
-                     [{element,<<"CreditTr"...>>,#{},[...]}]},
-                 {element,<<"SplmtryData">>,#{},
-                     [{element,<<"Supp"...>>,#{},...}]}]}]}]}]}
+           [{element,<<"GrpHdr">>,#{},
+                [{element,<<"MsgId">>,#{},[<<"7yz2 fqaJiMDrS1tG0N0"...>>]},
+                 {element,<<"CreDtTm">>,#{},[<<"2024-05-16T13:08"...>>]},
+                 {element,<<"BtchBookg">>,#{},[<<"FALSE">>]},
+                 {element,<<"NbOfTxs">>,#{},[<<"33402068"...>>]},
+                 {element,<<"CtrlSum">>,#{},[<<"89.0"...>>]},
+                 {element,<<"TtlIntrBkStt"...>>,
+                     #{<<"Ccy">> => <<"BQT">>},
+                     [<<...>>]},
+                 {element,<<"IntrBkSt"...>>,#{},[...]},
+                 {element,<<"Sttl"...>>,#{},...},
+                 {element,<<...>>,...},
+                 {element,...},
+                 {...}]},
+            {element,<<"CdtTrfTxInf">>,#{},
+                [{element,<<"PmtId">>,#{},
+                     [{element,<<"InstrId">>,#{},[...]},
+                      {element,<<"EndT"...>>,#{},...},
+                      {element,<<...>>,...},
+                      {element,...},
+                      {...}]},
+                 {element,<<"PmtTpInf">>,#{},
+                     [{element,<<"Inst"...>>,#{},...},
+                      {element,<<...>>,...},
+                      {element,...},
+                      {...}|...]},
+                 {element,<<"IntrBkSttlmAmt">>,
+                     #{<<"Ccy">> => <<"YZB">>},
+                     [<<"4828.280"...>>]},
+                 {element,<<"IntrBkSttlmDt">>,#{},[<<"2024"...>>]},
+                 {element,<<"SttlmPrty">>,#{},[<<...>>]},
+                 {element,<<"SttlmTmI"...>>,#{},[...]},
+                 {element,<<"Sttl"...>>,#{},...},
+                 {element,<<...>>,...},
+                 {element,...},
+                 {...}|...]},
+            {element,<<"SplmtryData">>,#{},
+                [{element,<<"PlcAndNm">>,#{},[<<"wBFGLIv62SvT"...>>]},
+                 {element,<<"Envlp">>,#{},[{'CDATA',<<...>>}]}]}]}]}]}
+
+
 ```
-
-

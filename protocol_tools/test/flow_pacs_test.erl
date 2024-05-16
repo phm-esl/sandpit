@@ -2,25 +2,44 @@
 
 -export([test/0]).
 
+-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+
 test() ->
   PACS_008 = generate_pacs_008(),
   Extract_008 = extraction_paths(pacs_008),
-  loop(codec_xml:decode(PACS_008),[],Extract_008).
+  ?log("Extract_008 = ~p.~n",[Extract_008]),
+  loop(codec_xml:decode_hook(PACS_008),[],Extract_008).
 
 
-
-loop({Atom,Content,Fn},In,Out) when is_function(Fn) ->
-  if Content =:= token ->
-       loop(Fn(),[Atom|In],Out);
-     is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
-       loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
-     hd(In) =:= Atom ->
-       loop(Fn(),tl(In),Out);
-     true ->
-       loop(Fn(),In,Out) end;
+loop({Token,Content,Fn},In,Out) when is_function(Fn) ->
+  case to_atom(trim(Token)) of
+    [] ->
+      ?log("Token = ~p.~n",[Token]),
+      skip(Fn(),[Token],In,Out);
+    [Atom] ->
+      ?log("Atom = ~p.~n",[Atom]),
+      if Content =:= token ->
+           loop(Fn(),[Atom|In],Out);
+         is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
+           loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
+         hd(In) =:= Atom ->
+           loop(Fn(),tl(In),Out);
+         true ->
+           loop(Fn(),In,Out) end end;
 loop(Decoded,[],Out) ->
   Extracted = path_utils:rollup(Out),
   {Extracted,Decoded}.
+
+skip(Hook,[],In,Out) ->
+  loop(Hook,In,Out);
+skip({Atom,Content,Fn},Skip,In,Out) ->
+  ?log("Atom = ~p.~n\tSkip = ~p.~n",[Atom,Skip]),
+  if Content =:= token ->
+       skip(Fn(),[Atom|Skip],In,Out);
+     hd(Skip) =:= Atom ->
+       skip(Fn(),tl(Skip),In,Out);
+     true ->
+       skip(Fn(),Skip,In,Out) end.
 
 
 %generate_pacs_003() ->
@@ -31,7 +50,7 @@ generate_pacs_008() ->
 
 generate_from_xsd(File_name) ->
   codec_xml:encode(
-    schema_xsd:generate_from_XSD_file(File_name,<<"Document">>) ).
+    schema_xsd:generate_from_XSD_file(File_name) ).
 
 extraction_paths(Type) ->
   GrpHdr = 
@@ -84,3 +103,20 @@ extraction_paths(Type) ->
                 {'Nm',[]},
                 PstlAdr ]} ]} ]} ]} ) end.
 
+
+
+
+
+
+
+
+
+
+
+
+trim(Bin) when is_binary(Bin) ->
+  lists:last(binary:split(Bin,<<$:>>,[global])).
+
+to_atom(Bin) when is_binary(Bin) ->
+  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
+  catch error:badarg -> [] end.

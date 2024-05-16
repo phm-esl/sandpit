@@ -170,19 +170,22 @@ test_decode(In) ->
   Elements = #{
     ['Header','Envelope'] => [],
     [attribute,trigger,'Body','Envelope'] => [] },
-  loop(codec_xml:decode(In),[],Elements).
+  loop(codec_xml:decode_hook(In),[],Elements).
 
 
 
-loop({Atom,Content,Fn},In,Out) when is_function(Fn) ->
-  if Content =:= token ->
-       loop(Fn(),[Atom|In],Out);
-     is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
-       loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
-     hd(In) =:= Atom ->
-       loop(Fn(),tl(In),Out);
-     true ->
-       loop(Fn(),In,Out) end;
+loop({Token,Content,Fn},In,Out) when is_function(Fn) ->
+  case to_atom(trim(Token)) of
+    [] -> loop(Fn(),In,Out);
+    [Atom] ->
+      if Content =:= token ->
+           loop(Fn(),[Atom|In],Out);
+         is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
+           loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
+         hd(In) =:= Atom ->
+           loop(Fn(),tl(In),Out);
+         true ->
+           loop(Fn(),In,Out) end end;
 loop(Decoded,[],Out) ->
   ?log("Extracted = ~p.~n",[path_utils:rollup(Out)]),
   Decoded.
@@ -203,3 +206,14 @@ test_frag({Bin,Good}=Test,Pos) ->
       if Pass -> test_frag(Test,Pos + 1);
          not is_function(Fn) -> ?log("Fn = ~p.~n",[Fn]), false;
          true -> ?log("Tail = ~p.~n",[Tail]), false end end.
+
+
+
+
+
+trim(Bin) when is_binary(Bin) ->
+  lists:last(binary:split(Bin,<<$:>>,[global])).
+
+to_atom(Bin) when is_binary(Bin) ->
+  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
+  catch error:badarg -> [] end.

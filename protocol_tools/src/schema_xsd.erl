@@ -2,7 +2,7 @@
 
 -export(
  [ encode/1
- , generate_from_XSD_file/2
+ , generate_from_XSD_file/1
  , generate_from_schema/2
  , raw_text/1
  , from_document/1
@@ -60,44 +60,50 @@ quote_value(_,_) -> $".
 %%%   The result is the Erlang term representing an XML
 %%%   document with #element{} records.
 %%%
-generate_from_XSD_file(File_name,Type_name) ->
+generate_from_XSD_file(File_name) ->
   {ok,Bin} = file:read_file(File_name),
   Document = decode_xsd(Bin),
   Trimmed = trim_namespace(Document),
-  [{element,<<"schema">>,Attrib,_}] = Trimmed,
+  [{element,<<"schema">>,Attrib,Content}] = Trimmed,
+  [Root] = [ X || #element{ name = <<"element">>, attributes = X } <- Content ],
+  #{ <<"name">> := Root_name, <<"type">> := Root_type } = Root,
   Namespace = maps:get(<<"targetNamespace">>,Attrib),
   Schema = from_document(Trimmed),
-  Top = generate_from_schema(Type_name,Schema),
-  {element,<<"Document">>,Doc_attr,Content} = Top,
+  Top = generate_from_schema(Root_type,Schema),
   [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
-    { element,
-      <<"Document">>,
-      Doc_attr#{ <<"xmlns">> => Namespace },
-      Content } ].
+    #element{
+      name = Root_name,
+      attributes = #{ <<"xmlns">> => Namespace },
+      content = Top } ].
 
-decode_xsd(Bin) -> decode_xsd_loop(codec_xml:decode(Bin),[],[]).
 
-decode_xsd_loop({Atom,Content,Fn},In,Out) when is_function(Fn) ->
-  %%
-  %%  The data-type names in the atom table will trigger the decode function
-  %%  hook because they match the names in the XSD.  The quick remedy is to
-  %%  immediately call the continuation Fn function.
-  %%
-  if Content =:= token; Content =:= empty; is_list(Content) -> ok;
-     true -> ?log("Atom = ~p.~n\tContent = ~p.~n",[Atom,Content]) end,
-  decode_xsd_loop(Fn(),In,Out);
-decode_xsd_loop(Decoded,[],[]) ->
-  Decoded.
 
+
+decode_xsd(Bin) -> codec_xml:decode(Bin).
 
 generate_from_schema(Type_name,Schema)
 when is_binary(Type_name), is_map(Schema) ->
-  Node = maps:get({typedef,Type_name},Schema),
-  generate_from_node(Node,Schema).
+  Typedef = maps:get({typedef,Type_name},Schema),
+  generate_from_typedef(Typedef,Schema).
 
-generate_from_node(Node,Schema) ->
-  Name = maps:get(name,Node),
-  case Node of
+generate_from_typedef(Typedef,Schema) ->
+  case Typedef of
+    #{ extension := _, base := Base_type_name } ->
+      Base_typedef = maps:get({typedef,Base_type_name},Schema),
+      generate_from_typedef(Base_typedef,Schema);
+    #{ sequence := any } ->
+      %
+      % They said "sequence of any". Might need <[CDATA[...]]> here?
+      %
+      Pattern = <<"[ -~]{0,999}">>,
+      Content = make_value:from_regexp(Pattern),
+      << "<![CDATA[", Content/binary, "]]>" >>;
+    #{ sequence := Sequence } when is_list(Sequence) ->
+      generate_sequence(Sequence,Schema);
+    #{ choice := Choice } ->
+        generate_choice(Choice,Schema);
+    #{ enumeration := Choice } ->
+        generate_choice(Choice,Schema);
     #{ type := string, minLength := Min, maxLength := Max}
     when is_integer(Min), is_integer(Max) ->
       Bmin = to_binary(Min),
@@ -105,36 +111,6 @@ generate_from_node(Node,Schema) ->
       make_value:from_regexp(
         <<"[ 0-9A-Za-z]{", Bmin/binary, $,, Bmax/binary, $}>> );
     #{ pattern := Pattern } -> make_value:from_regexp(Pattern);
-    #{ enumeration := Enum } ->
-      #element{
-        name = Name,
-        content = [make_value:pick_random(Enum)] };
-    #{ choice := Choice } ->
-      #element{
-        name = Name,
-        content = [generate_choice(Choice,Schema)] };
-    #{ sequence := any } ->
-      %
-      % They said "sequence of any". Might need <[CDATA[...]]> here?
-      %
-      Pattern = <<"[ -~]{0,999}">>,
-      Content = make_value:from_regexp(Pattern),
-      #element{
-        name = Name,
-        content = << "<![CDATA[", Content/binary, "]]>" >> };
-    #{ sequence := Sequence } when is_list(Sequence) ->
-      #element{
-        name = Name,
-        content = generate_sequence(Sequence,Schema) };
-    #{ extension := Extend, base := Base } ->
-      #element{
-        name = Name,
-        attributes = generate_attributes(Extend,Schema),
-        content = [generate_from_schema(Base,Schema)] };
-    #{ type := Type } when is_binary(Type) ->
-      #element{
-        name = Name,
-        content = [generate_from_schema(Type,Schema)] };
     #{ type := date } -> make_value:date();
     #{ type := dateTime } -> make_value:date_time();
     #{ type := time } -> make_value:time();
@@ -156,13 +132,12 @@ generate_from_node(Node,Schema) ->
                    "}" >>,
       make_value:from_regexp(Pattern) end.
 
-%%%
-%%%   Following generators are adequate:
-%%%
-
-generate_attributes(Extend,Schema) ->
-  Each = fun (I,O) -> gen_each_attr(I,Schema,O) end,
-  lists:foldl(Each,#{},Extend).
+generate_attributes(Type_def,Schema) ->
+  case Type_def of
+    #{ extension := Extend } ->
+      Each = fun (I,O) -> gen_each_attr(I,Schema,O) end,
+      lists:foldl(Each,#{},Extend);
+    #{ } -> #{ } end.
 
 gen_each_attr({attribute,Attr},Schema,Out) ->
   #{ name := Name, type := Type } = Attr,
@@ -171,13 +146,23 @@ gen_each_attr({attribute,Attr},Schema,Out) ->
 
 generate_sequence(Sequence,Schema) ->
   Each = fun ({element,I},O) ->
-    Element = generate_from_node(I,Schema),
+    Element = generate_from_element(I,Schema),
     [Element|O] end,
   lists:reverse(lists:foldl(Each,[],Sequence)).
 
 generate_choice(Choice,Schema) ->
-  {element,Pick} = make_value:pick_random(Choice),
-  generate_from_node(Pick,Schema).
+  case make_value:pick_random(Choice) of
+    {element,Pick} -> generate_from_element(Pick,Schema);
+    Pick when is_binary(Pick) -> Pick end.
+
+generate_from_element(Element,Schema) ->
+  Element_name = maps:get(name,Element),
+  Type_name = maps:get(type,Element),
+  Type_def = maps:get({typedef,Type_name},Schema),
+  #element{
+    name = Element_name,
+    attributes = generate_attributes(Type_def,Schema),
+    content = generate_from_typedef(Type_def,Schema) }.
 
 %%%
 %%%   Extract the raw document text without the markup decoration.

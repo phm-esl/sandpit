@@ -1,8 +1,7 @@
 -module(schema_xsd).
 
 -export(
- [ encode/1
- , generate_from_XSD_file/1
+ [ generate_from_XSD_file/1
  , generate_from_schema/2
  , raw_text/1
  , from_document/1
@@ -15,46 +14,9 @@
 
 -define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
-encode(In) -> to_binary(encode_elements(In)).
-
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
 to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
-
-encode_elements([]) -> [];
-encode_elements([Head|Tail]) -> [encode_elements(Head)|encode_elements(Tail)];
-encode_elements(Binary) when is_binary(Binary) -> Binary;
-encode_elements(#element{} = Element) ->
-  Attr = encode_attributes(Element),
-  case Element of
-    #element{ name = Name, content = empty} ->
-      [ $<, Name, Attr, $/, $> ];
-    #element{ name = Name, content = [] } ->
-      [ $<, Name, Attr, $/, $> ];
-    #element{ name = Name, content = Content } ->
-      Fill = encode_elements(Content),
-      [ $<, Name, Attr, $>,
-        Fill,
-        $<, $/, Name, $> ] end;
-encode_elements({prolog,Prolog}) ->
-  [ "<?xml", Prolog, "?>" ].
-
-encode_attributes(Element) ->
-  Attr = Element#element.attributes,
-  maps:fold(fun encode_each_attr/3,[],Attr).
-
-encode_each_attr(Name,Value,Out) ->
-  Quote = quote_value(Value),
-  [ $\s, Name, $=, Quote, Value, Quote | Out ].
-
-quote_value(Value) -> quote_value(0,Value).
-
-quote_value(Pos,Bin) when Pos < size(Bin) ->
-  case Bin of
-    << _:Pos/binary, $", _/binary >> -> $';
-    << _:Pos/binary, $', _/binary >> -> $";
-    _ -> quote_value(Pos + 1,Bin) end;
-quote_value(_,_) -> $".
 
 %%%
 %%%   The result is the Erlang term representing an XML
@@ -92,10 +54,7 @@ generate_from_typedef(Typedef,Schema) ->
       Base_typedef = maps:get({typedef,Base_type_name},Schema),
       generate_from_typedef(Base_typedef,Schema);
     #{ sequence := any } ->
-      %
-      % They said "sequence of any". Might need <[CDATA[...]]> here?
-      %
-      Pattern = <<"[ -~]{0,999}">>,
+      Pattern = <<"[ -~]{0,999}">>, % printable ASCII values 32..127
       Content = make_value:from_regexp(Pattern),
       << "<![CDATA[", Content/binary, "]]>" >>;
     #{ sequence := Sequence } when is_list(Sequence) ->
@@ -120,9 +79,6 @@ generate_from_typedef(Typedef,Schema) ->
     #{ type := base64, minLength := Min, maxLength := Max } ->
       make_value:base64(Min,Max);
     #{ type := decimal, totalDigits := Total, fractionDigits := Fract } ->
-      %
-      % A bit hacky, I confess (-:
-      %
       Left = to_binary(Total - Fract),
       Right = to_binary(Fract),
       Pattern = << "([1-9][0-9]{0,",

@@ -1,8 +1,31 @@
 -module(flow_pacs_test).
 
--export([test/0]).
+-export(
+  [ test/0
+  , test_dir/0 ] ).
 
 -define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+
+
+test_dir() ->
+  Dir = "protocol_tools/priv/",
+  {ok,Files} = file:list_dir(Dir),
+  XSD_files = [ Dir ++ X || X <- lists:filter(fun pick_xsd/1, Files) ],
+  ?log("XSD_files = ~p.~n",[XSD_files]),
+  ok = lists:foreach(fun xml_from_xsd/1,XSD_files).
+
+xml_from_xsd(In) ->
+  Out = codec_xml:encode(
+    schema_xsd:generate_from_XSD_file(In) ),
+  File_name = In ++ "-output.XML",
+  ?log("File_name = ~p.~n",[File_name]),
+  ok = file:write_file(File_name,Out).
+
+pick_xsd(In) ->
+  case lists:reverse(In) of
+    "dsx." ++ _ -> true;
+    "DSX." ++ _ -> true;
+    _ -> false end.
 
 test() ->
   PACS_008 = generate_pacs_008(),

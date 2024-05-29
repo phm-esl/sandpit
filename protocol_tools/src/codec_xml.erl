@@ -64,7 +64,9 @@ encode_elements(#element{} = Element) ->
         Fill,
         ?end_tag, Name, ?greater_than ] end;
 encode_elements({prolog,Prolog}) ->
-  [ "<?xml", Prolog, "?>" ].
+  [ "<?xml", Prolog, "?>" ];
+encode_elements({'CDATA',Cdata}) ->
+  [ "<![CDATA[", Cdata, "]]>" ].
 
 encode_attributes(Element) ->
   Attr = Element#element.attributes,
@@ -98,7 +100,7 @@ loop(Decoded) -> Decoded.
 decode_hook(<< ?processsing_instruction_start, Tail/binary >>) ->
   process_instruct(Tail,fun prolog/2).
 
-prolog(Bin,{process_instruct,<< "xml", _/binary>>=PI}) ->
+prolog(Bin,{process_instruct,<< "xml", PI/binary>>}) ->
   Next = fun(T) -> doctypedecl(T,{prolog,PI}) end,
   white_space(Bin,Next).
 
@@ -382,7 +384,6 @@ hook(In,Out,Done) when is_function(Done) ->
    Token when is_binary(Token) ->
      { Token, token, Next };
    #element{ name = Elem_name, content = Content } ->
-     { Elem_name, Content, Next };
-   _ -> Next() end.
+     { Elem_name, Content, Next } end.
 
 result(In,Out,Done) when is_function(Done) -> Done(In,Out).

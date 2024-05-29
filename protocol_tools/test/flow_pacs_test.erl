@@ -4,8 +4,9 @@
   [ test/0
   , test_dir/0 ] ).
 
--define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
-
+%-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+%-define(log(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),ok).
 
 test_dir() ->
   Dir = "protocol_tools/priv/",
@@ -27,113 +28,156 @@ pick_xsd(In) ->
     "DSX." ++ _ -> true;
     _ -> false end.
 
+
+
+
 test() ->
   PACS_008 = generate_pacs_008(),
-  Extract_008 = extraction_paths(pacs_008),
+  file:write_file("tmp.xml",PACS_008), % write document to file for debugging
+  Extract_008 = extraction_maps(pacs_008),
   ?log("Extract_008 = ~p.~n",[Extract_008]),
-  loop(codec_xml:decode_hook(PACS_008),[],Extract_008).
+  Out = follow_nested_map(
+    codec_xml:decode_hook(PACS_008),
+    Extract_008,
+    []),
+  {Values,_} = Out,
+  Path =
+    [ 'Document',
+      'FIToFICstmrCdtTrf',
+      'CdtTrfTxInf',
+      'Dbtr',
+      'PstlAdr',
+      'TwnNm'],
+  TwnNm = value_of(Path,Values),
+  {{Path,TwnNm},Out}.
 
+%%%
+%%%   Digging into a nested map of key-value pairs:
+%%%
+value_of(Path,Map) -> lists:foldl( fun maps:get/2, Map, Path ).
 
-loop({Token,Content,Fn},In,Out) when is_function(Fn) ->
+follow_nested_map(Decoded,Extracted,[]) when is_list(Decoded) ->
+  {Extracted,Decoded};
+
+follow_nested_map({Token,token,Fn}=Hook,Extract,Path) ->
   case to_atom(trim(Token)) of
-    [] ->
-      ?log("Token = ~p.~n",[Token]),
-      skip(Fn(),[Token],In,Out);
+    [Atom] when is_map_key(Atom,Extract) ->
+      case Extract of
+        #{ Atom := Down } when is_map(Down) ->
+          ?log("Atom = ~p.~n\tExtract = ~p.~n\tDown = ~p.~n",
+               [Atom,Extract,Down]),
+          follow_nested_map(Fn(),Down,[{Atom,Extract}|Path]);
+
+        #{ Atom := Old } when is_list(Old) ->
+          {Token,Content,Next} = seek_end(Hook),
+          New = [Content|Old],
+          ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
+               [Atom,Extract,New]),
+          follow_nested_map(Next(),Extract#{ Atom := New },Path) end;
+    _ ->
+      ?log("Token = ~p.~n\tExtract = ~p.~n",
+           [Token,Extract]),
+      {Token,_,Next} = seek_end(Hook),
+      follow_nested_map(Next(),Extract,Path) end;
+
+follow_nested_map({Token,_Content,Fn},Down,[{Atom,Up}|Path])
+when is_map_key(Atom,Up) ->
+  case to_atom(trim(Token)) of
     [Atom] ->
-      ?log("Atom = ~p.~n",[Atom]),
-      if Content =:= token ->
-           loop(Fn(),[Atom|In],Out);
-         is_list(Content), hd(In) =:= Atom, is_map_key(In,Out) ->
-           loop(Fn(),tl(In),Out#{ In := [Content|maps:get(In,Out)] });
-         hd(In) =:= Atom ->
-           loop(Fn(),tl(In),Out);
-         true ->
-           loop(Fn(),In,Out) end end;
-loop(Decoded,[],Out) ->
-  Extracted = path_utils:rollup(Out),
-  {Extracted,Decoded}.
-
-skip(Hook,[],In,Out) ->
-  loop(Hook,In,Out);
-skip({Atom,Content,Fn},Skip,In,Out) ->
-  ?log("Atom = ~p.~n\tSkip = ~p.~n",[Atom,Skip]),
-  if Content =:= token ->
-       skip(Fn(),[Atom|Skip],In,Out);
-     hd(Skip) =:= Atom ->
-       skip(Fn(),tl(Skip),In,Out);
-     true ->
-       skip(Fn(),Skip,In,Out) end.
+      ?log("Token = ~p.~n\tContent = ~p.~n\tAtom = ~p.~n",
+        [Token,_Content,Atom]),
+      New = Up#{ Atom := Down },
+      follow_nested_map(Fn(),New,Path) end.
 
 
-%generate_pacs_003() ->
-%  generate_from_xsd("protocol_tools/priv/pacs.003.001.10.xsd").
 
-generate_pacs_008() ->
-    generate_from_xsd("protocol_tools/priv/pacs.008.001.11.xsd").
+-if(0).
+test_seek_end() ->
+  PACS_008 = generate("pacs.008"),
+  file:write_file("tmp.xml",PACS_008),
+  Decoded = codec_xml:decode(PACS_008),
+  Decoded = seek_end(codec_xml:decode_hook(PACS_008)),
+  Encoded = codec_xml:encode(Decoded),
+  if PACS_008 =:= Encoded -> test_passed;
+     true -> test_failed end.
+-endif.
+%%%
+%%%   seek_end/1 will short-circuit the API hook call-back so that the
+%%%   document element Token and all its subelements will be ignored,
+%%%   returning control to the calling context when the Token end-element
+%%%   is found.
+%%%
+seek_end({Token,token,Fn}) ->
+  seek_end(Fn(),[Token]);
+seek_end(Hook) ->
+  Hook.
+
+seek_end({Token,Content,Fn} = Hook,Path) ->
+  if Path =:= [Token] -> Hook;
+     Content =:= token -> seek_end(Fn(),[Token|Path]);
+     hd(Path) =:= Token -> seek_end(Fn(),tl(Path)) end;
+seek_end(Decoded,[]) when is_list(Decoded) ->
+  Decoded.
+
+
+
+
+%read_pacs_008() ->
+%  {ok,PACS_008} = file:read_file("protocol_tools/priv/pacs008.xml"),
+%  PACS_008.
+
+%generate_pacs_003() -> generate("pacs.003").
+
+generate_pacs_008() -> generate("pacs.008").
+
+generate(Name) ->
+  Dir = "protocol_tools/priv/",
+  [File] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
+  generate_from_xsd(Dir ++ File).
 
 generate_from_xsd(File_name) ->
   codec_xml:encode(
     schema_xsd:generate_from_XSD_file(File_name) ).
 
-extraction_paths(Type) ->
-  GrpHdr = 
-  {'GrpHdr',[
-    {'MsgId',[]},
-    {'CreDtTm',[]},
-    {'NbOfTxs',[]},
-    {'SttlmInf',[
-      {'SttlmMtd',[]} ]} ]},
-  PmtId =
-  {'PmtId',[
-    {'EndToEndId',[]} ]},
-  PstlAdr =
-  {'PstlAdr',[
-    {'AdrTp',[{'Cd',[]}]},
-    {'StrtNm',[]},
-    {'BldgNb',[]},
-    {'PstCd',[]},
-    {'TwnNm',[]},
-    {'DstrctNm',[]} ]},
+
+
+extraction_maps(Type) ->
+  GrpHdr = #{'MsgId' => [],
+           'CreDtTm' => [],
+           'NbOfTxs' => [],
+           'SttlmInf' => #{'SttlmMtd' => []}},
+  PmtId = #{'EndToEndId' => []},
+  PstlAdr = #{'AdrTp' => #{'Cd' => []},
+               'StrtNm' => [],
+               'BldgNb' => [],
+               'PstCd' => [],
+               'TwnNm' => [],
+               'DstrctNm' => []},
   case Type of
     pacs_003 ->
-      path_utils:extraction_paths(
-        {'Document',[
-          {'FIToFICstmrDrctDbt',[
-            GrpHdr,
-            {'DrctDbtTxInf',[
-              PmtId,
-              {'IntrBkSttlmAmt',[]} ]} ]} ]} );
+      #{'Document' =>
+        #{'FIToFICstmrDrctDbt' =>
+            #{'GrpHdr' => GrpHdr,
+              'DrctDbtTxInf' =>
+                  #{'PmtId' => PmtId,
+                    'IntrBkSttlmAmt' => []}}}};
     pacs_008 ->
-      path_utils:extraction_paths(
-        {'Document',[
-          {'FIToFICstmrCdtTrf',[
-            GrpHdr,
-            {'CdtTrfTxInf',[
-              PmtId,
-              {'IntrBkSttlmAmt',[]},
-              {'ChrgBr',[]},
-              {'Dbtr',[
-                {'Nm',[]},
-                PstlAdr,
-                {'CtryOfRes',[]} ]},
-              {'DbtrAgt',[
-                {'FinInstnId',[
-                  {'BICFI',[]}]}]},
-              {'CdtrAgt',[
-                {'FinInstnId',[
-                  {'BICFI',[]}]}]},
-              {'Cdtr',[
-                {'Nm',[]},
-                PstlAdr ]} ]} ]} ]} ) end.
-
-
-
-
-
-
-
-
-
+      #{'Document' =>
+        #{'FIToFICstmrCdtTrf' =>
+           #{'GrpHdr' => GrpHdr,
+             'CdtTrfTxInf' =>
+             #{'PmtId' => PmtId,
+               'IntrBkSttlmAmt' => [],
+               'ChrgBr' => [],
+               'Dbtr' =>
+               #{'Nm' => [],
+                 'PstlAdr' => PstlAdr,
+                 'CtryOfRes' => []},
+               'DbtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+               'CdtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+               'Cdtr' =>
+               #{'Nm' => [],
+                 'PstlAdr' => PstlAdr }}}}} end.
 
 
 

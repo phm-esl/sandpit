@@ -7,6 +7,10 @@
  , from_document/1
  , trim_namespace/1 ] ).
 
+%%%
+%%%   TODO: Either use a map instead of record, or move
+%%%         definition to header file.
+%%%
 -record(element,
   { name = << >>,
     attributes = #{},

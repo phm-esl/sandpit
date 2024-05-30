@@ -34,6 +34,10 @@
 -define(declaration_start,"<!").
 -define(declaration_end,">").
 
+%%%
+%%%   TODO: Either use a map instead of record, or move
+%%%         definition to header file.
+%%%
 -record(element,
   { name = << >>,
     attributes = #{},
@@ -94,7 +98,7 @@ quote_value(_,_) -> $".
 decode(Binary) ->
   loop(decode_hook(Binary)).
 
-loop({_,_,Fn}) when is_function(Fn) -> loop(Fn());
+loop({_,Fn}) when is_function(Fn) -> loop(Fn());
 loop(Decoded) -> Decoded.
 
 decode_hook(<< ?processsing_instruction_start, Tail/binary >>) ->
@@ -380,10 +384,6 @@ white_space(In,Done) ->
 %%%
 hook(In,Out,Done) when is_function(Done) ->
   Next = fun () -> Done(In,Out) end,
-  case Out of
-   Token when is_binary(Token) ->
-     { Token, token, Next };
-   #element{ name = Elem_name, content = Content } ->
-     { Elem_name, Content, Next } end.
+  {Out,Next}.
 
 result(In,Out,Done) when is_function(Done) -> Done(In,Out).

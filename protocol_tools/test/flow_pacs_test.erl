@@ -4,6 +4,16 @@
   [ test/0
   , test_dir/0 ] ).
 
+%%%
+%%%   TODO: Either use a map instead of record, or move
+%%%         definition to header file.
+%%%
+-record(element,
+  { name = << >>,
+    attributes = #{},
+    content = [] }).
+
+
 %-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 %-define(log(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 -define(log(F,A),ok).
@@ -59,7 +69,7 @@ value_of(Path,Map) -> lists:foldl( fun maps:get/2, Map, Path ).
 follow_nested_map(Decoded,Extracted,[]) when is_list(Decoded) ->
   {Extracted,Decoded};
 
-follow_nested_map({Token,token,Fn}=Hook,Extract,Path) ->
+follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
   case to_atom(trim(Token)) of
     [Atom] when is_map_key(Atom,Extract) ->
       case Extract of
@@ -69,7 +79,8 @@ follow_nested_map({Token,token,Fn}=Hook,Extract,Path) ->
           follow_nested_map(Fn(),Down,[{Atom,Extract}|Path]);
 
         #{ Atom := Old } when is_list(Old) ->
-          {Token,Content,Next} = seek_end(Hook),
+          {Element,Next} = seek_end(Hook),
+          #element{ content = Content } = Element,
           New = [Content|Old],
           ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
                [Atom,Extract,New]),
@@ -77,15 +88,16 @@ follow_nested_map({Token,token,Fn}=Hook,Extract,Path) ->
     _ ->
       ?log("Token = ~p.~n\tExtract = ~p.~n",
            [Token,Extract]),
-      {Token,_,Next} = seek_end(Hook),
+      {#element{ name = Token },Next} = seek_end(Hook),
       follow_nested_map(Next(),Extract,Path) end;
 
-follow_nested_map({Token,_Content,Fn},Down,[{Atom,Up}|Path])
+follow_nested_map({Element,Fn},Down,[{Atom,Up}|Path])
 when is_map_key(Atom,Up) ->
+  #element{ name = Token } = Element,
   case to_atom(trim(Token)) of
     [Atom] ->
-      ?log("Token = ~p.~n\tContent = ~p.~n\tAtom = ~p.~n",
-        [Token,_Content,Atom]),
+      ?log("Element = ~p.~n\tAtom = ~p.~n",
+        [Element,Atom]),
       New = Up#{ Atom := Down },
       follow_nested_map(Fn(),New,Path) end.
 
@@ -107,15 +119,17 @@ test_seek_end() ->
 %%%   returning control to the calling context when the Token end-element
 %%%   is found.
 %%%
-seek_end({Token,token,Fn}) ->
+seek_end({Token,Fn}) when is_binary(Token) ->
   seek_end(Fn(),[Token]);
 seek_end(Hook) ->
   Hook.
 
-seek_end({Token,Content,Fn} = Hook,Path) ->
-  if Path =:= [Token] -> Hook;
-     Content =:= token -> seek_end(Fn(),[Token|Path]);
-     hd(Path) =:= Token -> seek_end(Fn(),tl(Path)) end;
+seek_end({#element{ name = Token },_} = Out,[Token]) ->
+  Out;
+seek_end({Token,Fn},Path) when is_binary(Token) ->
+  seek_end(Fn(),[Token|Path]);
+seek_end({#element{ name = Token },Fn},[Token|Path]) ->
+  seek_end(Fn(),Path);
 seek_end(Decoded,[]) when is_list(Decoded) ->
   Decoded.
 

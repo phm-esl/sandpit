@@ -1112,94 +1112,275 @@ loop:187
 
 
 Example of a PACS.008 message generated with random values, decoded, and the
-specified values extracted to a nested map:
+specified values extracted to a nested map. The form of the extraction map
+for the example of PACS.008 message type:
+
+```
+1> flow_pacs_test:extraction_maps(pacs008).
+#{'Document' =>
+      #{'FIToFICstmrCdtTrf' =>
+            #{'CdtTrfTxInf' =>
+                  #{'Dbtr' =>
+                        #{'PstlAdr' =>
+                              #{'TwnNm' => [],
+                                'AdrTp' => #{'Cd' => []},
+                                'BldgNb' => [],'DstrctNm' => [],'PstCd' => [],
+                                'StrtNm' => []},
+                          'Nm' => [],'CtryOfRes' => []},
+                    'Cdtr' =>
+                        #{'PstlAdr' =>
+                              #{'TwnNm' => [],
+                                'AdrTp' => #{'Cd' => []},
+                                'BldgNb' => [],'DstrctNm' => [],'PstCd' => [],
+                                'StrtNm' => []},
+                          'Nm' => []},
+                    'CdtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+                    'ChrgBr' => [],
+                    'DbtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+                    'IntrBkSttlmAmt' => [],
+                    'PmtId' => #{'EndToEndId' => []}},
+              'GrpHdr' =>
+                  #{'CreDtTm' => [],'MsgId' => [],'NbOfTxs' => [],
+                    'SttlmInf' => #{'SttlmMtd' => []}}}}}
+```
+
+The individual values for each name in the map is extracted with a short
+function:
+
+```
+value_of(Path,Map) -> lists:foldl( fun maps:get/2, Map, Path ).
+```
+
+The path is specified like so:
+
+```
+['Document','FIToFICstmrCdtTrf','CdtTrfTxInf','Dbtr','PstlAdr','TwnNm']
+```
+
+The result of a test performed on a PACS.008 message generated from the
+corresponding XSD file:
 
 ```
 1> flow_pacs_test:test().
-{#{'Document' =>
-     #{'FIToFICstmrCdtTrf' =>
-       #{'GrpHdr' =>
-         #{'MsgId' => [[<<"7yz2 fqaJiMDrS1tG0N0rq">>]],
-           'CreDtTm' => [[<<"2024-05-16T13:08:09">>]],
-           'NbOfTxs' => [[<<"33402068860">>]],
-           'SttlmInf' => #{'SttlmMtd' => [[<<"INDA">>]]}},
-         'CdtTrfTxInf' =>
-           #{'PmtId' => #{'EndToEndId' => [[<<"tS1WHpd0CYk5Cw6E">>]]},
-             'IntrBkSttlmAmt' => [[<<"4828.28005">>]],
-             'ChrgBr' => [[<<"SHAR">>]],
-             'Dbtr' =>
-               #{'Nm' => [[<<"3Ywlp9JWSEIx5EGnWsf">>]],
-                 'PstlAdr' =>
-                     #{'AdrTp' => #{'Cd' => []},
-                       'StrtNm' =>
-                           [[<<"aVAnzHRhGresXP734zBI6PlAtHF1PfB0ecZtejjBnszpg34cnmcsqthkxtfC">>]],
-                       'BldgNb' => [[<<"iiPCqFz5FIz53AU5">>]],
-                       'PstCd' => [[<<"zN">>]],
-                       'TwnNm' => [[<<"OdI ">>]],
-                       'DstrctNm' =>
-                           [[<<"iYs4PNsZS56 lOYnOyj6LWoaUPB6t">>]]},
-                 'CtryOfRes' => [[<<"GZ">>]]},
-             'DbtrAgt' =>
-                 #{'FinInstnId' =>
-                       #{'BICFI' => [[<<"D3V1XXZOZ8R">>]]}},
-             'CdtrAgt' =>
-                 #{'FinInstnId' =>
-                       #{'BICFI' => [[<<"8AR1MQNYXM3">>]]}},
-             'Cdtr' =>
-                 #{'Nm' =>
-                     [[<<"X8MGKZfzej26OgQFDuSG5oWXctW0eAoJf2Mjmf1 1EkCcPKqy8gibpwsoD 2I2C8yEoll88wN1nzVgf">>]],
-                   'PstlAdr' =>
-                     #{'AdrTp' => #{'Cd' => [[<<"BIZZ">>]]},
-                       'StrtNm' =>
-                           [[<<"a8TjvWRtO9JEOD6tHGWiD1yH1nVWbcVJEL4KK7OoT40DA4ezC9M5ZMxCromLkwwls8V">>]],
-                       'BldgNb' => [[<<"omhAr">>]],
-                       'PstCd' => [[<<"RSTMz9E">>]],
-                       'TwnNm' => [[<<"QFS">>]],
-                       'DstrctNm' => [[<<"nXJG6E">>]]}}}}}},
- [{prolog,<<"xml version=\"1.0\" encoding=\"UTF-8\" ">>},
-  {element,<<"Document">>,
-      #{<<"xmlns">> =>
-            <<"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">>},
-      [{element,<<"FIToFICstmrCdtTrf">>,#{},
-           [{element,<<"GrpHdr">>,#{},
-                [{element,<<"MsgId">>,#{},[<<"7yz2 fqaJiMDrS1tG0N0"...>>]},
-                 {element,<<"CreDtTm">>,#{},[<<"2024-05-16T13:08"...>>]},
-                 {element,<<"BtchBookg">>,#{},[<<"FALSE">>]},
-                 {element,<<"NbOfTxs">>,#{},[<<"33402068"...>>]},
-                 {element,<<"CtrlSum">>,#{},[<<"89.0"...>>]},
-                 {element,<<"TtlIntrBkStt"...>>,
-                     #{<<"Ccy">> => <<"BQT">>},
-                     [<<...>>]},
-                 {element,<<"IntrBkSt"...>>,#{},[...]},
-                 {element,<<"Sttl"...>>,#{},...},
-                 {element,<<...>>,...},
-                 {element,...},
-                 {...}]},
-            {element,<<"CdtTrfTxInf">>,#{},
-                [{element,<<"PmtId">>,#{},
-                     [{element,<<"InstrId">>,#{},[...]},
-                      {element,<<"EndT"...>>,#{},...},
-                      {element,<<...>>,...},
-                      {element,...},
-                      {...}]},
-                 {element,<<"PmtTpInf">>,#{},
-                     [{element,<<"Inst"...>>,#{},...},
-                      {element,<<...>>,...},
-                      {element,...},
-                      {...}|...]},
-                 {element,<<"IntrBkSttlmAmt">>,
-                     #{<<"Ccy">> => <<"YZB">>},
-                     [<<"4828.280"...>>]},
-                 {element,<<"IntrBkSttlmDt">>,#{},[<<"2024"...>>]},
-                 {element,<<"SttlmPrty">>,#{},[<<...>>]},
-                 {element,<<"SttlmTmI"...>>,#{},[...]},
-                 {element,<<"Sttl"...>>,#{},...},
-                 {element,<<...>>,...},
-                 {element,...},
-                 {...}|...]},
-            {element,<<"SplmtryData">>,#{},
-                [{element,<<"PlcAndNm">>,#{},[<<"wBFGLIv62SvT"...>>]},
-                 {element,<<"Envlp">>,#{},[{'CDATA',<<...>>}]}]}]}]}]}
-
+%
+%  Extracted value of 'TwnNm' is "r460lAF6DNvDGHimeBbCF". The 'element'
+%  tuple has the value name "TwnNm", the attributes of the element (here
+%  there are none, hence the empty map #{}) and the generated value contents.
+%
+{{['Document','FIToFICstmrCdtTrf','CdtTrfTxInf','Dbtr','PstlAdr','TwnNm'],
+  [{element,<<"TwnNm">>,#{},[<<"r460lAF6DNvDGHimeBbCF">>]}]},
+%
+%  The entire set of extracted values from the PACS.008 message:
+%
+ {#{'Document' =>
+    #{'FIToFICstmrCdtTrf' =>
+      #{'CdtTrfTxInf' =>
+        #{'Dbtr' =>
+          #{'PstlAdr' =>
+            #{'TwnNm' =>
+                  [{element,<<"TwnNm">>,#{},[<<"r460lAF6DNvDGHimeBbCF">>]}],
+              'AdrTp' => #{'Cd' => []},
+              'BldgNb' => [{element,<<"BldgNb">>,#{},[<<"Gaq1dAAfBNp">>]}],
+              'DstrctNm' =>
+                  [{element,<<"DstrctNm">>,#{},[<<"LRlbbZecmjub1QT">>]}],
+              'PstCd' => [{element,<<"PstCd">>,#{},[<<"uFp ASwzgRf">>]}],
+              'StrtNm' =>
+                  [{element,<<"StrtNm">>,#{},[<<"H47fq7rLVZ9i">>]}]},
+            'Nm' =>
+                [{element,<<"Nm">>,#{},
+                  [<<"NH0C3xuJCw4LDur1EcjyMr0Hay6Wz83jU2dv44KDbhbhCn"...>>]}],
+            'CtryOfRes' => [{element,<<"CtryOfRes">>,#{},[<<"IY">>]}]},
+          'Cdtr' =>
+          #{'PstlAdr' =>
+            #{'TwnNm' =>
+                  [{element,<<"TwnNm">>,#{},[<<"23 jhTomvr 29WBnDMP">>]}],
+              'AdrTp' => #{'Cd' => [{element,<<"Cd">>,#{},[<<"HOME">>]}]},
+              'BldgNb' => [{element,<<"BldgNb">>,#{},[<<"kb6">>]}],
+              'DstrctNm' =>
+                  [{element,<<"DstrctNm">>,#{},[<<"3d4LSMjZTy">>]}],
+              'PstCd' => [{element,<<"PstCd">>,#{},[<<"w2">>]}],
+              'StrtNm' =>
+                  [{element,<<"StrtNm">>,#{},
+                    [<<"9mY0Kh6p5W3t3NSjB0w5hcFj30hr2oj6yhUlKqzlhrU"...>>]}]},
+            'Nm' =>
+                [{element,<<"Nm">>,#{},[<<"BRLeBg4GBY468lQhOUR3p">>]}]},
+          'CdtrAgt' =>
+              #{'FinInstnId' =>
+                    #{'BICFI' =>
+                          [{element,<<"BICFI">>,#{},[<<"V86TETSR6SI">>]}]}},
+          'ChrgBr' => [{element,<<"ChrgBr">>,#{},[<<"SHAR">>]}],
+          'DbtrAgt' =>
+              #{'FinInstnId' =>
+                    #{'BICFI' =>
+                          [{element,<<"BICFI">>,#{},[<<"ZV4CLGZ6P2T">>]}]}},
+          'IntrBkSttlmAmt' =>
+              [{element,<<"IntrBkSttlmAmt">>,
+                        #{<<"Ccy">> => <<"AGB">>},
+                        [<<"78787401.8842">>]}],
+          'PmtId' =>
+              #{'EndToEndId' =>
+                    [{element,<<"EndToEndId">>,#{},
+                              [<<"s8M0k4mLhEFtBvPlOBMQQRRl5rGtOQ6I8Vz">>]}]}},
+        'GrpHdr' =>
+            #{'CreDtTm' =>
+                  [{element,<<"CreDtTm">>,#{},[<<"2024-05-30T09:38:38">>]}],
+              'MsgId' =>
+                  [{element,<<"MsgId">>,#{},[<<"zj2UqMzK5yvLuIXv">>]}],
+              'NbOfTxs' =>
+                  [{element,<<"NbOfTxs">>,#{},[<<"6041533959672">>]}],
+              'SttlmInf' =>
+                  #{'SttlmMtd' =>
+                        [{element,<<"SttlmMtd">>,#{},[<<"INGA">>]}]}}}}},
+%
+%  The decoded representation of the PACS.008 message as an Erlang term:
+%
+  [{prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
+   {element,<<"Document">>,
+            #{<<"xmlns">> =>
+                  <<"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">>},
+            [{element,<<"FIToFICstmrCdtTrf">>,#{},
+                      [{element,<<"GrpHdr">>,#{},
+                                [{element,<<"MsgId">>,#{},
+                                          [<<"zj2UqMzK5yvL"...>>]},
+                                 {element,<<"CreDtTm">>,#{},
+                                          [<<"2024-05-"...>>]},
+                                 {element,<<"BtchBookg">>,#{},[<<"FALS"...>>]},
+                                 {element,<<"NbOfTxs">>,#{},[<<...>>]},
+                                 {element,<<"CtrlSum">>,#{},[...]},
+                                 {element,<<"TtlI"...>>,#{...},...},
+                                 {element,<<...>>,...},
+                                 {element,...},
+                                 {...}|...]},
+                       {element,<<"CdtTrfTxInf">>,#{},
+                                [{element,<<"PmtId">>,#{},
+                                          [{element,<<...>>,...},
+                                           {element,...},{...}|...]},
+                                 {element,<<"PmtTpInf">>,#{},
+                                          [{element,...},{...}|...]},
+                                 {element,<<"IntrBkSttlmA"...>>,
+                                          #{<<"Ccy">> => <<"AGB">>},
+                                          [<<...>>]},
+                                 {element,<<"IntrBkSt"...>>,#{},[...]},
+                                 {element,<<"Sttl"...>>,#{},...},
+                                 {element,<<...>>,...},
+                                 {element,...},
+                                 {...}|...]},
+                       {element,<<"SplmtryData">>,#{},
+                                [{element,<<"PlcAndNm">>,#{},[<<"CnvO"...>>]},
+                                 {element,<<"Envlp">>,#{},[{...}]}]}]}]}]}}
 
 ```
+
+The generated XML message is stored as `tml.xml` for the purpose of
+inspection and debugging:
+
+```
+1015> tidy -xml -indent ./tmp.xml |head -100
+No warnings or errors were found.
+
+<?xml version="1.0" encoding="utf-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>zj2UqMzK5yvLuIXv</MsgId>
+      <CreDtTm>2024-05-30T09:38:38</CreDtTm>
+      <BtchBookg>FALSE</BtchBookg>
+      <NbOfTxs>6041533959672</NbOfTxs>
+      <CtrlSum>39.981521300</CtrlSum>
+      <TtlIntrBkSttlmAmt Ccy="MLN">
+      159515721.9042</TtlIntrBkSttlmAmt>
+      <IntrBkSttlmDt>2024-05-30</IntrBkSttlmDt>
+      <SttlmInf>
+        <SttlmMtd>INGA</SttlmMtd>
+        <SttlmAcct>
+          <Id>
+            <IBAN>TP87JY88y2ONo9GibVVQIMjNdQ</IBAN>
+          </Id>
+          <Tp>
+            <Cd>dQu</Cd>
+          </Tp>
+          <Ccy>UWW</Ccy>
+          <Nm>i2e7FFyjF7VmIb7U0</Nm>
+          <Prxy>
+            <Tp>
+              <Prtry>aK2NOB</Prtry>
+            </Tp>
+            <Id>
+            91un694EK8RCY7Scm7geWkeppaTzJ8bAk6VFp49hHaCgOoijkWxsbp5LgsDIGAPb13jF
+            4xtGsmbSOKEY0L2HGHKIg5C8lcC6fPZVlWgZ0U5TZDOK0PuAcptRNYAgAPWTRRwubKvnkn
+            swy</Id>
+          </Prxy>
+        </SttlmAcct>
+        <ClrSys>
+          <Prtry>9qhS</Prtry>
+        </ClrSys>
+        <InstgRmbrsmntAgt>
+          <FinInstnId>
+            <BICFI>TRFJDW85WGO</BICFI>
+            <ClrSysMmbId>
+              <ClrSysId>
+                <Prtry>F5N8Ueq499Xvg</Prtry>
+              </ClrSysId>
+              <MmbId>ZkJQjAXmsNJ</MmbId>
+            </ClrSysMmbId>
+            <LEI>A7369I75VY6J9U14ZU18</LEI>
+            <Nm>T
+            sqk93rbVw0RzqyoHdJtzK0P0a1xX76fdaUTo41809rXCD8nCxCAAmqSc778w
+            LewxrGCrjdh3htwHMJ7kxWX5l6q5n5</Nm>
+            <PstlAdr>
+              <AdrTp>
+                <Prtry>
+                  <Id>ELiZ</Id>
+                  <Issr>bx9mRqZ9kFZ lTX5XC2aewC47ScEe</Issr>
+                  <SchmeNm>utiXYE07 YR6ny08yNLX1</SchmeNm>
+                </Prtry>
+              </AdrTp>
+              <Dept>
+              qJHOiEUQ8XiG9bhdsDAb1JwusG7ZrQMaciRPIGDsPSGOmYOZR9wLrqNla</Dept>
+              <SubDept>48Ch6isjGmb</SubDept>
+              <StrtNm>
+              m2AikNpwM17BrJKLj2VXEAzzxgaIkbYiBkkkIHfDugk9iqN9W1d0P9gz7XcF4</StrtNm>
+              <BldgNb>4bk2BRhDyYfrT</BldgNb>
+              <BldgNm>1VYq3BDNb5J78uwm1BCvWof</BldgNm>
+              <Flr>0lWaYLkzQSzaLm4QmawL</Flr>
+              <PstBx>HkFWC32LSEebP</PstBx>
+              <Room>8s</Room>
+              <PstCd>zbbXOPh</PstCd>
+              <TwnNm>fQiTgKQi17nycIzAXxkxTqKVgVMGv54Swpt</TwnNm>
+              <TwnLctnNm>
+              kVcDavdDgIPYsTJfJZB8FRKzfvPLjunoGw7</TwnLctnNm>
+              <DstrctNm>fonLxBt8nyw Gnp fYlvEEKYj</DstrctNm>
+              <CtrySubDvsn>JeCZTHS2CPatM</CtrySubDvsn>
+              <Ctry>VT</Ctry>
+              <AdrLine>U7jnqbWpeyxrg5eFjk6N5R0KjkOZtNUtTvx2
+              qx2G3c8nhSkhtmKTPF</AdrLine>
+            </PstlAdr>
+            <Othr>
+              <Id>4PjVj</Id>
+              <SchmeNm>
+                <Prtry>VZMOIiKomxcRuVdjtS1</Prtry>
+              </SchmeNm>
+              <Issr>OEKfjos3RVN0Lz janzgU6HwyvLol</Issr>
+            </Othr>
+          </FinInstnId>
+          <BrnchId>
+            <Id>gJ3mrwIpJ7f6veJlID7FbdKvmTU</Id>
+            <LEI>FJBWOK4HVJ8EDOLO1H11</LEI>
+            <Nm>Rfcs SXT0dOLVskqxrhb8z06MM8HwDFAjAOAkNA0u4Ck4K</Nm>
+            <PstlAdr>
+              <AdrTp>
+                <Prtry>
+                  <Id>ivvs</Id>
+                  <Issr>gd2cRZrDtiiXz1yWNVs</Issr>
+                  <SchmeNm>DelWVo6RO</SchmeNm>
+                </Prtry>
+              </AdrTp>
+              <Dept>HyEhs0jSg DLdeiR4gWe9jMDa8mFEGP</Dept>
+              <SubDept>
+              cY3Wd2HIBPL1oLPS6AYMnFXjaH1ZOgoxiEfJYsb</SubDept>
+```
+
+Still to do: use the values extracted from one message to be inserted into
+another generated message, for example a response to a request, and override
+the random generated values that these specific values replace.
+

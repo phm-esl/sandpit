@@ -1,5 +1,7 @@
 -module(flow_pacs_test).
 
+-compile([export_all]).
+
 -export(
   [ test/0
   , test_dir/0 ] ).
@@ -80,8 +82,7 @@ follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
 
         #{ Atom := Old } when is_list(Old) ->
           {Element,Next} = seek_end(Hook),
-          #element{ content = Content } = Element,
-          New = [Content|Old],
+          New = [Element|Old],
           ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
                [Atom,Extract,New]),
           follow_nested_map(Next(),Extract#{ Atom := New },Path) end;

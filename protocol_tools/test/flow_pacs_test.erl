@@ -1,10 +1,10 @@
 -module(flow_pacs_test).
 
--compile([export_all]).
-
 -export(
   [ test/0
-  , test_dir/0 ] ).
+  , test_dir/0
+  , test_seek_end/0
+  , test_remap/0 ] ).
 
 %%%
 %%%   TODO: Either use a map instead of record, or move
@@ -104,7 +104,6 @@ when is_map_key(Atom,Up) ->
 
 
 
--if(0).
 test_seek_end() ->
   PACS_008 = generate("pacs.008"),
   file:write_file("tmp.xml",PACS_008),
@@ -113,7 +112,7 @@ test_seek_end() ->
   Encoded = codec_xml:encode(Decoded),
   if PACS_008 =:= Encoded -> test_passed;
      true -> test_failed end.
--endif.
+
 %%%
 %%%   seek_end/1 will short-circuit the API hook call-back so that the
 %%%   document element Token and all its subelements will be ignored,
@@ -141,7 +140,7 @@ seek_end(Decoded,[]) when is_list(Decoded) ->
 %  {ok,PACS_008} = file:read_file("protocol_tools/priv/pacs008.xml"),
 %  PACS_008.
 
-generate_pacs_003() -> generate("pacs.003").
+% generate_pacs_003() -> generate("pacs.003").
 
 generate_pacs_008() -> generate("pacs.008").
 

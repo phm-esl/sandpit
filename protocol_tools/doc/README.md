@@ -1486,27 +1486,27 @@ PACS.008 message generated with random values:
 ```
 1> flow_pacs_test:test_remap().
 flow_pacs_test:test_remap:227
-	New = #{'Document' =>
-                 #{'FIToFICstmrDrctDbt' =>
-                    #{'GrpHdr' =>
-                       #{'CreDtTm' =>
-                          [{element,<<"CreDtTm">>,#{},
-                            [<<"2024-05-30T13:36:47">>]}],
-                         'MsgId' => [{element,<<"MsgId">>,#{},[<<"XXz">>]}],
-                         'NbOfTxs' =>
-                          [{element,<<"NbOfTxs">>,#{},[<<"3635211813">>]}],
-                         'SttlmInf' =>
-                          #{'SttlmMtd' =>
-                             [{element,<<"SttlmMtd">>,#{},[<<"INGA">>]}]}},
-                      'DrctDbtTxInf' =>
-                       #{'IntrBkSttlmAmt' =>
-                          [{element,<<"IntrBkSttlmAmt">>,
-                            #{<<"Ccy">> => <<"ZKD">>},
-                            [<<"75250730.3716">>]}],
-                         'PmtId' =>
-                          #{'EndToEndId' =>
-                             [{element,<<"EndToEndId">>,#{},
-                               [<<"mo88FtbiSkfmWADyaHlkRHLH0yNrQC515c">>]}]}}}}}.
+    New = #{'Document' =>
+             #{'FIToFICstmrDrctDbt' =>
+                #{'GrpHdr' =>
+                   #{'CreDtTm' =>
+                      [{element,<<"CreDtTm">>,#{},
+                        [<<"2024-05-30T13:36:47">>]}],
+                     'MsgId' => [{element,<<"MsgId">>,#{},[<<"XXz">>]}],
+                     'NbOfTxs' =>
+                      [{element,<<"NbOfTxs">>,#{},[<<"3635211813">>]}],
+                     'SttlmInf' =>
+                      #{'SttlmMtd' =>
+                         [{element,<<"SttlmMtd">>,#{},[<<"INGA">>]}]}},
+                  'DrctDbtTxInf' =>
+                   #{'IntrBkSttlmAmt' =>
+                      [{element,<<"IntrBkSttlmAmt">>,
+                        #{<<"Ccy">> => <<"ZKD">>}, % attribute currency unit
+                        [<<"75250730.3716">>]}],
+                     'PmtId' =>
+                      #{'EndToEndId' =>
+                         [{element,<<"EndToEndId">>,#{},
+                           [<<"mo88FtbiSkfmWADyaHlkRHLH0yNrQC515c">>]}]}}}}}.
 ```
 
 The output written to file, where the template is provided by the file

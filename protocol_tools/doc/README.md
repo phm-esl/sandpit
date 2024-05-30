@@ -1116,7 +1116,7 @@ specified values extracted to a nested map. The form of the extraction map
 for the example of PACS.008 message type:
 
 ```
-1> flow_pacs_test:extraction_maps(pacs008).
+1> flow_pacs_test:extraction_maps(pacs_008).
 #{'Document' =>
       #{'FIToFICstmrCdtTrf' =>
             #{'CdtTrfTxInf' =>
@@ -1384,3 +1384,155 @@ Still to do: use the values extracted from one message to be inserted into
 another generated message, for example a response to a request, and override
 the random generated values that these specific values replace.
 
+## Insert extracted values into a generated message
+
+
+A short example of a PACS.003 message:
+
+```
+$> tidy -xml -indent protocol_tools/priv/pacs003.xml
+No warnings or errors were found.
+
+<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.003.001.10">
+  <FIToFICstmrDrctDbt>
+    <GrpHdr>
+      <MsgId>pacs3bizmsgid9307360</MsgId>
+      <CreDtTm>2024-04-30T11:35:58Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>INDA</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+    <DrctDbtTxInf>
+      <PmtId>
+        <EndToEndId>1596226709586302</EndToEndId>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="INR">
+      3846583070957.69366</IntrBkSttlmAmt>
+    </DrctDbtTxInf>
+  </FIToFICstmrDrctDbt>
+</Document>
+```
+
+The extraction map above is specific to a `FIToFICstmrCdtTrf` document. The
+corresponding map to insert values must be a `FIToFICstmrDrctDbt` document
+of the form described below:
+
+```
+1> flow_pacs_test:extraction_maps(pacs_003).
+#{'Document' =>
+      #{'FIToFICstmrDrctDbt' =>
+            #{'GrpHdr' =>
+                  #{'CreDtTm' => [],'MsgId' => [],'NbOfTxs' => [],
+                    'SttlmInf' => #{'SttlmMtd' => []}},
+              'DrctDbtTxInf' =>
+                  #{'IntrBkSttlmAmt' => [],
+                    'PmtId' => #{'EndToEndId' => []}}}}}
+```
+
+Compare to the map for PACS.008:
+
+```
+2> flow_pacs_test:extraction_maps(pacs_008).
+#{'Document' =>
+      #{'FIToFICstmrCdtTrf' =>
+            #{'CdtTrfTxInf' =>
+                  #{'Dbtr' =>
+                        #{'PstlAdr' =>
+                              #{'TwnNm' => [],
+                                'AdrTp' => #{'Cd' => []},
+                                'BldgNb' => [],'DstrctNm' => [],'PstCd' => [],
+                                'StrtNm' => []},
+                          'Nm' => [],'CtryOfRes' => []},
+                    'Cdtr' =>
+                        #{'PstlAdr' =>
+                              #{'TwnNm' => [],
+                                'AdrTp' => #{'Cd' => []},
+                                'BldgNb' => [],'DstrctNm' => [],'PstCd' => [],
+                                'StrtNm' => []},
+                          'Nm' => []},
+                    'CdtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+                    'ChrgBr' => [],
+                    'DbtrAgt' => #{'FinInstnId' => #{'BICFI' => []}},
+                    'IntrBkSttlmAmt' => [],
+                    'PmtId' => #{'EndToEndId' => []}},
+              'GrpHdr' =>
+                  #{'CreDtTm' => [],'MsgId' => [],'NbOfTxs' => [],
+                    'SttlmInf' => #{'SttlmMtd' => []}}}}}
+```
+
+The conversion requires that `FIToFICstmrCdtTrf` is switched with
+`FIToFICstmrDrctDbt`, and `CdtTrfTxInf` with `DrctDbtTxInf`. The positions
+of these switched values within the nested maps remains the same, there is
+no need to relocate the values. The conversion can be specified with a
+one-to-one mapping:
+
+```
+#{ 'Document' =>
+   { 'Document',
+      #{ 'FIToFICstmrCdtTrf' =>
+         { 'FIToFICstmrDrctDbt',  % changed value name
+           #{ 'GrpHdr' => 'GrpHdr',  % copied verbatim
+              'CdtTrfTxInf' =>
+                { 'DrctDbtTxInf',  % changed value name
+                  #{ 'PmtId' => 'PmtId',  % copied verbatim
+                     'IntrBkSttlmAmt' => 'IntrBkSttlmAmt' }} }} }} }
+```
+
+Demonstration by using the unit test, where the values are extracted from a
+PACS.008 message generated with random values:
+
+```
+1> flow_pacs_test:test_remap().
+flow_pacs_test:test_remap:227
+	New = #{'Document' =>
+                 #{'FIToFICstmrDrctDbt' =>
+                    #{'GrpHdr' =>
+                       #{'CreDtTm' =>
+                          [{element,<<"CreDtTm">>,#{},
+                            [<<"2024-05-30T13:36:47">>]}],
+                         'MsgId' => [{element,<<"MsgId">>,#{},[<<"XXz">>]}],
+                         'NbOfTxs' =>
+                          [{element,<<"NbOfTxs">>,#{},[<<"3635211813">>]}],
+                         'SttlmInf' =>
+                          #{'SttlmMtd' =>
+                             [{element,<<"SttlmMtd">>,#{},[<<"INGA">>]}]}},
+                      'DrctDbtTxInf' =>
+                       #{'IntrBkSttlmAmt' =>
+                          [{element,<<"IntrBkSttlmAmt">>,
+                            #{<<"Ccy">> => <<"ZKD">>},
+                            [<<"75250730.3716">>]}],
+                         'PmtId' =>
+                          #{'EndToEndId' =>
+                             [{element,<<"EndToEndId">>,#{},
+                               [<<"mo88FtbiSkfmWADyaHlkRHLH0yNrQC515c">>]}]}}}}}.
+```
+
+The output written to file, where the template is provided by the file
+contents of `protocol_tools/priv/pacs003.xml`:
+
+```
+$> tidy -xml -indent ./tmp.xml
+No warnings or errors were found.
+
+<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.003.001.10">
+  <FIToFICstmrDrctDbt>
+    <GrpHdr>
+      <MsgId>XXz</MsgId>
+      <CreDtTm>2024-05-30T13:36:47</CreDtTm>
+      <NbOfTxs>3635211813</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>INGA</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+    <DrctDbtTxInf>
+      <PmtId>
+        <EndToEndId>mo88FtbiSkfmWADyaHlkRHLH0yNrQC515c</EndToEndId>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="ZKD">75250730.3716</IntrBkSttlmAmt>
+    </DrctDbtTxInf>
+  </FIToFICstmrDrctDbt>
+</Document>
+```

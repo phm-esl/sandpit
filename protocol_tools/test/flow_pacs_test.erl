@@ -16,9 +16,9 @@
     content = [] }).
 
 
-%-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
-%-define(log(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
--define(log(F,A),ok).
+%-define(log(F,A),logger:notice("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
+%-define(log(F,A),ok).
 
 test_dir() ->
   Dir = "protocol_tools/priv/",
@@ -76,19 +76,19 @@ follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
     [Atom] when is_map_key(Atom,Extract) ->
       case Extract of
         #{ Atom := Down } when is_map(Down) ->
-          ?log("Atom = ~p.~n\tExtract = ~p.~n\tDown = ~p.~n",
-               [Atom,Extract,Down]),
+        %  ?log("Atom = ~p.~n\tExtract = ~p.~n\tDown = ~p.~n",
+        %       [Atom,Extract,Down]),
           follow_nested_map(Fn(),Down,[{Atom,Extract}|Path]);
 
         #{ Atom := Old } when is_list(Old) ->
           {Element,Next} = seek_end(Hook),
           New = [Element|Old],
-          ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
-               [Atom,Extract,New]),
+        %  ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
+        %       [Atom,Extract,New]),
           follow_nested_map(Next(),Extract#{ Atom := New },Path) end;
     _ ->
-      ?log("Token = ~p.~n\tExtract = ~p.~n",
-           [Token,Extract]),
+    %  ?log("Token = ~p.~n\tExtract = ~p.~n",
+    %       [Token,Extract]),
       {#element{ name = Token },Next} = seek_end(Hook),
       follow_nested_map(Next(),Extract,Path) end;
 
@@ -97,8 +97,8 @@ when is_map_key(Atom,Up) ->
   #element{ name = Token } = Element,
   case to_atom(trim(Token)) of
     [Atom] ->
-      ?log("Element = ~p.~n\tAtom = ~p.~n",
-        [Element,Atom]),
+    %  ?log("Element = ~p.~n\tAtom = ~p.~n",
+    %    [Element,Atom]),
       New = Up#{ Atom := Down },
       follow_nested_map(Fn(),New,Path) end.
 
@@ -141,7 +141,7 @@ seek_end(Decoded,[]) when is_list(Decoded) ->
 %  {ok,PACS_008} = file:read_file("protocol_tools/priv/pacs008.xml"),
 %  PACS_008.
 
-%generate_pacs_003() -> generate("pacs.003").
+generate_pacs_003() -> generate("pacs.003").
 
 generate_pacs_008() -> generate("pacs.008").
 
@@ -202,3 +202,67 @@ trim(Bin) when is_binary(Bin) ->
 to_atom(Bin) when is_binary(Bin) ->
   try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
   catch error:badarg -> [] end.
+
+
+
+
+test_remap() ->
+  Request = generate_pacs_008(),
+  Extract = extraction_maps(pacs_008),
+  {Old,_} = follow_nested_map(
+    codec_xml:decode_hook(Request),
+    Extract,
+    []),
+  Remap =
+    #{ 'Document' =>
+       { 'Document',
+          #{ 'FIToFICstmrCdtTrf' =>
+             { 'FIToFICstmrDrctDbt',
+               #{ 'GrpHdr' => 'GrpHdr',
+                  'CdtTrfTxInf' =>
+                    { 'DrctDbtTxInf',
+                      #{ 'PmtId' => 'PmtId',
+                         'IntrBkSttlmAmt' => 'IntrBkSttlmAmt' }} }} }} },
+  New = remap(Old,Remap),
+  ?log("New = ~p.~n",[New]),
+  test_insert(New).
+
+test_insert(New) ->
+  {ok,Bin} = file:read_file("protocol_tools/priv/pacs003.xml"),
+  Decode = codec_xml:decode(Bin),
+  Inserted = codec_xml:encode(insert_values(Decode,New)),
+  file:write_file("tmp.xml",Inserted).
+
+
+remap(In,Map) ->
+  element(1,maps:fold( fun remap_each/3, {#{},Map}, In)).
+
+remap_each(Key,Val,{Out,Map}) ->
+  case Map of
+    #{ Key := {Switch,Into} } ->
+      { Out#{ Switch => remap(Val,Into) }, Map };
+    #{ Key := Switch } ->
+      { Out#{ Switch => Val }, Map };
+    #{ } -> {Out,Map} end.
+
+insert_values([],_) -> [];
+insert_values([Head|Tail],Values) ->
+  [insert_values(Head,Values)|insert_values(Tail,Values)];
+insert_values(#element{} = Element,Values) ->
+  #element{ name = Token } = Element,
+  case to_atom(trim(Token)) of
+    [] -> Element;
+    [Atom] ->
+      case Values of
+        #{ Atom := Into } when is_map(Into) ->
+        %  ?log("Atom = ~p.~n\tInto = ~p.~n\tElement = ~p.~n",
+        %    [Atom,Into,Element]),
+          Content = Element#element.content,
+          Update = insert_values(Content,Into),
+          Element#element{ content = Update };
+        #{ Atom := [#element{ attributes = Attr, content = Content }] } ->
+        %  ?log("Atom = ~p.~n\tContent = ~p.~n\tElement = ~p.~n",
+        %    [Atom,Content,Element]),
+          Element#element{ attributes = Attr, content = Content };
+        #{ } -> Element end end;
+insert_values(Other,_) -> Other.

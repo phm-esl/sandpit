@@ -1536,3 +1536,849 @@ No warnings or errors were found.
   </FIToFICstmrDrctDbt>
 </Document>
 ```
+
+
+
+
+
+# Insert values from XML message into JSON template
+
+The JSON schema for PACS-003 obtained from ISO20022.plus:
+
+pacs.003.001.08-FIToFICustomerDirectDebitV08.Message.schema.json 
+
+```
+1> {ok,Bin} = file:read_file(
+  "ISO20022/JSON-MixedType/"
+  "pacs.003.001.08-FIToFICustomerDirectDebitV08.Message.schema.json").
+{ok,
+ << "{\n\t\"$schema\": \"http://json-schema.org/schema#\","
+    "\n\t\"description\": \"This is the ISO20022.plus json schema for t"...>>}
+
+2> Schema = codec_JSON:decode(Bin).
+
+3> maps:keys(Schema).
+[ type,
+  description,
+  <<"$schema">>,
+  <<"additionalProperties">>,
+  <<"definitions">>,
+  <<"properties">> ]
+
+4> maps:get(<<"$schema">>,Schema).
+<<"http://json-schema.org/schema#">>
+
+5> maps:get(<<"properties">>,Schema).
+#{<<"Document">> =>
+      #{<<"$ref">> => <<"#/definitions/.Document">>}}
+
+6> lists:sort(maps:keys(maps:get(<<"definitions">>,Schema))).
+[<<".Document">>,
+ <<"AccountIdentification4Choice">>,
+ <<"AccountSchemeName1Choice">>,
+ <<"ActiveCurrencyAndAmount">>,
+ <<"ActiveCurrencyCode">>,
+ <<"ActiveOrHistoricCurrencyAndAmount">>,
+ <<"ActiveOrHistoricCurrencyCode">>,
+ <<"AddressType2Code">>,
+ <<"AddressType3Choice">>,
+ <<"AmendmentInformationDetails13">>,
+ <<"AnyBICDec2014Identifier">>,
+ <<"Authorisation1Choice">>,
+ <<"Authorisation1Code">>,
+ <<"BICFIDec2014Identifier">>,
+ <<"BaseOneRate">>,
+ <<"BatchBookingIndicator">>,
+ <<"BranchAndFinancialInstitutionIdentification6">>,
+ <<"BranchData3">>,
+ <<"CashAccount38">>,
+ <<"CashAccountType2Choice">>,
+ <<"CategoryPurpose1Choice">>,
+ <<"ChargeBearerType1Code">>,
+ <<"Charges7">>,
+ <<"ClearingChannel2Code">>,
+ <<"ClearingSystemIdentification2Choice">>,
+ <<"ClearingSystemIdentification3Choice">>,
+ <<"ClearingSystemMemberIdentification2">>,
+ <<"Contact4">>,
+ <<"CountryCode">>,
+ <<"CreditDebitCode">>,
+ <<"CreditorReferenceInformation2">>,
+ <<"CreditorReferenceType1Choice">>,
+ <<"CreditorReferenceType2">>,
+ <<"DateAndPlaceOfBirth1">>,
+ <<"DatePeriod2">>,
+ <<"DecimalNumber">>,
+ <<"DirectDebitTransaction10">>,
+ <<"DirectDebitTransactionInformation24">>,
+ <<"DiscountAmountAndType1">>,
+ <<"DiscountAmountType1Choice">>,
+ <<"DocumentAdjustment1">>,
+ <<"DocumentLineIdentification1">>,
+ <<"DocumentLineInformation1">>,
+ <<"DocumentLineType1">>,
+ <<"DocumentLineType1Choice">>,
+ <<"DocumentType3Code">>,
+ <<"DocumentType6Code">>,
+ <<"Exact2NumericText">>,
+ <<"Exact4AlphaNumericText">>,
+ <<"ExternalAccountIdentification1Code">>,
+ <<"ExternalCashAccountType1Code">>,
+ <<"ExternalCashClearingSystem1Code">>,
+ <<"ExternalCategoryPurpose1Code">>,
+ <<"ExternalClearingSystemIdentification1Code">>,
+ <<"ExternalDiscountAmountType1Code">>,
+ <<"ExternalDocumentLineType1Code">>,
+ <<"ExternalFinancialInstitutionIdentification1Code">>,
+ <<"ExternalGarnishmentType1Code">>,
+ <<"ExternalLocalInstrument1Code">>,
+ <<"ExternalMandateSetupReason1Code">>,
+ <<"ExternalOrganisationIdentification1Code">>,
+ <<"ExternalPersonIdentification1Code">>,
+ <<"ExternalProxyAccountType1Code">>,
+ <<"ExternalPurpose1Code">>,
+ <<"ExternalServiceLevel1Code">>,
+ <<"ExternalTaxAmountType1Code">>,
+ <<"FinancialIdentificationSchemeName1Choice">>,
+ <<"FinancialInstitutionIdentification18">>,
+ <<"Frequency36Choice">>,
+ <<"Frequency6Code">>,
+ <<"FrequencyAndMoment1">>,
+ <<"FrequencyPeriod1">>,
+ <<"Garnishment3">>,
+ <<"GarnishmentType1">>,
+ <<"GarnishmentType1Choice">>,
+ <<"GenericAccountIdentification1">>,
+ <<"GenericFinancialIdentification1">>,
+ <<"GenericIdentification30">>,
+ <<"GenericOrganisationIdentification1">>,
+ <<"GenericPersonIdentification1">>,
+ <<"GroupHeader94">>,
+ <<"IBAN2007Identifier">>,
+ <<"ISODate">>,
+ <<"ISODateTime">>,
+ <<"LEIIdentifier">>,
+ <<"LocalInstrument2Choice">>,
+ <<"MandateRelatedInformation14">>,
+ <<"MandateSetupReason1Choice">>,
+ <<"Max1025Text">>,
+ <<"Max10Text">>,
+ <<"Max128Text">>,
+ <<"Max140Text">>,
+ <<"Max15NumericText">>,
+ <<"Max16Text">>,
+ <<"Max2048Text">>,
+ <<"Max34Text">>,
+ <<"Max350Text">>,
+ <<"Max35Text">>,
+ <<"Max4Text">>,
+ <<"Max70Text">>,
+ <<"NameAndAddress16">>,
+ <<"NamePrefix2Code">>,
+ <<"Number">>,
+ <<"OrganisationIdentification29">>,
+ <<"OrganisationIdentificationSchemeName1Choice">>,
+ <<"OtherContact1">>,
+ <<"Party38Choice">>,
+ <<"PartyIdentification135">>,
+ <<"PaymentIdentification7">>,
+ <<"PaymentTypeInformation27">>,
+ <<"PercentageRate">>,
+ <<"PersonIdentification13">>,
+ <<"PersonIdentificationSchemeName1Choice">>,
+ <<"PhoneNumber">>,
+ <<"PostalAddress24">>,
+ <<"PreferredContactMethod1Code">>,
+ <<"Priority2Code">>,
+ <<"Priority3Code">>,
+ <<"ProxyAccountIdentification1">>,
+ <<"ProxyAccountType1Choice">>,
+ <<"Purpose2Choice">>,
+ <<"ReferredDocumentInformation7">>,
+ <<"ReferredDocumentType3Choice">>,
+ <<"ReferredDocumentType4">>,
+ <<"RegulatoryAuthority2">>,
+ <<"RegulatoryReporting3">>,
+ <<"RegulatoryReportingType1Code">>,
+ <<"RemittanceAmount2">>,
+ <<"RemittanceAmount3">>,
+ <<"RemittanceInformation16">>,
+ <<"RemittanceLocation7">>,
+ <<"RemittanceLocationData1">>,
+ <<"RemittanceLocationMethod2Code">>,
+ <<"SequenceType3Code">>,
+ <<"ServiceLevel8Choice">>,
+ <<"SettlementDateTimeIndication1">>,
+ <<"SettlementInstruction8">>,
+ <<"SettlementMethod2Code">>,
+ <<"StructuredRegulatoryReporting3">>,
+ <<"StructuredRemittanceInformation16">>,
+ <<"SupplementaryData1">>,
+ <<"SupplementaryDataEnvelope1">>,
+ <<"TaxAmount2">>,
+ <<"TaxAmountAndType1">>,
+ <<"TaxAmountType1Choice">>,
+ <<"TaxAuthorisation1">>,
+ <<"TaxInformation7">>,
+ <<"TaxParty1">>,
+ <<"TaxParty2">>,
+ <<"TaxPeriod2">>,
+ <<"TaxRecord2">>,
+ <<"TaxRecordDetails2">>,
+ <<"TaxRecordPeriod1Code">>,
+ <<"TrueFalseIndicator">>,
+ <<"UUIDv4Identifier">>,
+ <<"pacs.003.001.08-FIToFICustomerDirectDebitV08">>]
+```
+
+
+
+Type definition of `.Document`, which in turn refers to
+`pacs.003.001.08-FIToFICustomerDirectDebitV08`:
+
+```
+lists:foldl( fun maps:get/2, Schema, [<<"definitions">>,<<".Document">>]).
+#{<<"$ref">> =>
+      <<"#/definitions/pacs.003.001.08-FIToFICustomerDirectDebitV08">>}
+
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"pacs.003.001.08-FIToFICustomerDirectDebitV08">> ] ).
+
+#{type => object,
+  description =>
+      <<"Scope\r\n"
+        "The FinancialInstitutionToFinancialInstitutionCustomerDirectDebit"
+        " message is sent by the creditor agent to the debtor agent,"
+        " directly or through other agents and/or a payment clearing"
+        " and settlement system.\r\nIt is used to collect funds from"
+        " a debtor account for a creditor.\r\nUsage\r\n"
+        "The FItoFICustomerDirectDebit message can contain one or more"
+        " customer direct debit instructions.\r\n"
+        "The FIToFICustomerDirectDebit message does not allow for grouping.\r\n"
+        "The FItoFICustomerDirectDebit message may or may not contain"
+        " mandate related information, that is extracts from a mandate,"
+        " such as the MandateIdentification or DateOfSignature. The "
+        "FIToFICustomerDirectDebit message must not be considered as"
+        " a mandate.\r\n"
+        "The FItoFICustomerDirectDebit message can be used in domestic"
+        " and cross-border scenarios.">>,
+  <<"additionalProperties">> => false,
+  <<"properties">> =>
+      #{<<"@businessArea">> => #{type => string},
+        <<"@flavour">> => #{type => string},
+        <<"@messageFunctionality">> => #{type => string},
+        <<"@name">> => #{type => string},
+        <<"@version">> => #{type => string},
+        <<"DirectDebitTransactionInformation">> =>
+            #{type => array,
+              description =>
+                  <<"Set of elements providing information specific to"
+                    " the individual direct debit(s).">>,
+              items =>
+                  #{<<"$ref">> =>
+                        <<"#/definitions/DirectDebitTransactionInformation24">>},
+              <<"minItems">> => 1},
+        <<"GroupHeader">> =>
+            #{description =>
+                  <<"Set of characteristics shared by all individual"
+                    " transactions included in the message.">>,
+              <<"$ref">> => <<"#/definitions/GroupHeader94">>},
+        <<"SupplementaryData">> =>
+            #{type => array,
+              description =>
+                  <<"Additional information that cannot be captured in the"
+                    " structured elements and/or any other specific block.">>,
+              items =>
+                  #{<<"$ref">> => <<"#/definitions/SupplementaryData1">>}}},
+  <<"required">> =>
+      {<<"GroupHeader">>,<<"DirectDebitTransactionInformation">>}}
+```
+
+Type definition of `GroupHeader`
+
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"GroupHeader94">> ] ).
+#{type => object,
+  description =>
+      <<"Set of characteristics shared by all individual transactions"
+        " included in the message.">>,
+  <<"additionalProperties">> => false,
+  <<"properties">> =>
+      #{<<"Authorisation">> =>
+            #{type => array,
+              description =>
+                  <<"User identification or any user key to be used to"
+                    " check whether the initiating party is allowed to"
+                    " initiate transactions from the account specified"
+                    " in the message.\n\n"
+                    "Usage: The content is not of a technical nature,"
+                    " but reflects the organisational structure at the"
+                    " initiating side.\nThe authorisation element can"
+                    " typically be used in relay scenarios, payment"
+                    " initiations, payment returns or payment reversals"
+                    " that are initiated on behalf of a party different"
+                    " from the initiating party.">>,
+              items =>
+                  #{<<"$ref">> => <<"#/definitions/Authorisation1Choice">>},
+              <<"maxItems">> => 2},
+        <<"BatchBooking">> =>
+            #{description =>
+                  <<"Identifies whether a single entry per individual"
+                    " transaction or a batch entry for the sum of the"
+                    " amounts of all transactions within the group of a"
+                    " message is requested.\n"
+                    "Usage: Batch booking is used to request and not"
+                    " order a possible batch booking.">>,
+              <<"$ref">> => <<"#/definitions/BatchBookingIndicator">>},
+        <<"ControlSum">> =>
+            #{description =>
+                  <<"Total of all individual amounts included in the"
+                    " message, irrespective of currencies.">>,
+              <<"$ref">> => <<"#/definitions/DecimalNumber">>},
+        <<"CreationDateTime">> =>
+            #{description =>
+                  <<"Date and time at which the message was created.">>,
+              <<"$ref">> => <<"#/definitions/ISODateTime">>},
+        <<"InstructedAgent">> =>
+            #{description =>
+                  <<"Agent that is instructed by the previous party in the"
+                    " chain to carry out the (set of) instruction(s).">>,
+              <<"$ref">> =>
+                  <<"#/definitions/BranchAndFinancialInstitutionIdentification6">>},
+        <<"InstructingAgent">> =>
+            #{description =>
+                  <<"Agent that instructs the next party in the chain to"
+                    " carry out the (set of) instruction(s).">>,
+              <<"$ref">> =>
+                  <<"#/definitions/BranchAndFinancialInstitutionIdentification6">>},
+        <<"InterbankSettlementDate">> =>
+            #{description =>
+                  <<"Date on which the amount of money ceases to be"
+                    " available to the agent that owes it and when the"
+                    " amount of money becomes available to the agent to"
+                    " which it is due.">>,
+              <<"$ref">> => <<"#/definitions/ISODate">>},
+        <<"MessageIdentification">> =>
+            #{description =>
+                  <<"Point to point reference, as assigned by the"
+                    " instructing party, and sent to the next party in the"
+                    " chain to unambiguously identify the message.\n"
+                    "Usage: The instructing party has to make sure that"
+                    " MessageIdentification is unique per instructed party"
+                    " for a pre-agreed period.">>,
+              <<"$ref">> => <<"#/definitions/Max35Text">>},
+        <<"NumberOfTransactions">> =>
+            #{description =>
+                  <<"Number of individual transactions contained in the"
+                    " message.">>,
+              <<"$ref">> => <<"#/definitions/Max15NumericText">>},
+        <<"PaymentTypeInformation">> =>
+            #{description =>
+                  <<"Set of elements used to further specify the type of"
+                    " transaction.">>,
+              <<"$ref">> => <<"#/definitions/PaymentTypeInformation27">>},
+        <<"SettlementInformation">> =>
+            #{description =>
+                  <<"Specifies the details on how the settlement of the"
+                    " transaction(s) between the instructing agent and the"
+                    " instructed agent is completed.">>,
+              <<"$ref">> => <<"#/definitions/SettlementInstruction8">>},
+        <<"TotalInterbankSettlementAmount">> =>
+            #{description =>
+                  <<"Total amount of money moved between the instructing"
+                    " agent and the instructed agent.">>,
+              <<"$ref">> => <<"#/definitions/ActiveCurrencyAndAmount">>}},
+  <<"required">> =>
+      {<<"MessageIdentification">>,
+       <<"CreationDateTime">>,
+       <<"NumberOfTransactions">>,
+       <<"SettlementInformation">>}}
+```
+
+Type definition of `MessageIdentification`
+
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"Max35Text">> ] ).
+#{type => string,
+  description =>
+      <<"Specifies a character string with"
+        " a maximum length of 35 characters.">>,
+  <<"maxLength">> => 35,<<"minLength">> => 1}
+```
+
+Type definition of `CreationDateTime`
+
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"ISODateTime">> ] ).
+#{type => string,
+  description =>
+      <<"A particular point in the progression of time defined by a"
+        " mandatory date and a mandatory time component, expressed"
+        " in either UTC time format (YYYY-MM-DDThh:mm:ss.sssZ), local"
+        " time with UTC offset format (YYYY-MM-DDThh:mm:ss.sss+/-hh:mm),"
+        " or local time format (YYYY-MM-DDThh:mm:ss.sss). These"
+        " representations are defined in \"XML Schema Part 2: Datatypes"
+        " Second Edition - W3C Recommendation 28 October 2004\" which is"
+        " aligned with ISO 8601.\n"
+        "Note on the time format:\n"
+        "1) beginning / end of calendar day\n00:00:00 = the beginning of"
+          " a calendar day\n24:00:00 = the end of a calendar day\n"
+        "2) fractions of second in time format\n"
+        "Decimal fractions of seconds may be included. In this case, the"
+        " involved parties shall agree on the maximum number of digits"
+        " that are allowed.">>}
+```
+
+Type definition of `NumberOfTransactions`
+
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"Max15NumericText">> ] ).
+#{type => string,
+  description =>
+      <<"Specifies a numeric string with a maximum length of 15 digits.">>,
+  pattern => <<"^[0-9]{1,15}$">>}
+```
+
+Type definition of `SettlementInformation`
+
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"SettlementInstruction8">> ] ).
+#{type => object,
+  description =>
+      <<"Provides further details on the settlement of the instruction.">>,
+  <<"additionalProperties">> => false,
+  <<"properties">> =>
+      #{<<"ClearingSystem">> =>
+            #{description =>
+                  <<"Specification of a pre-agreed offering between"
+                  " clearing agents or the channel through which the"
+                  " payment instruction is processed.">>,
+              <<"$ref">> =>
+                  <<"#/definitions/ClearingSystemIdentification3Choice">>},
+        <<"SettlementAccount">> =>
+            #{description =>
+                  <<"A specific purpose account used to post debit and"
+                    " credit entries as a result of the transaction.">>,
+              <<"$ref">> => <<"#/definitions/CashAccount38">>},
+        <<"SettlementMethod">> =>
+            #{description =>
+                  <<"Method used to settle the (batch of)"
+                    " payment instructions.">>,
+              <<"$ref">> => <<"#/definitions/SettlementMethod2Code">>}},
+  <<"required">> => {<<"SettlementMethod">>}}
+```
+
+Type definition of `SettlementMethod`
+```
+lists:foldl(
+  fun maps:get/2,
+  Schema,
+  [ <<"definitions">>,
+    <<"SettlementMethod2Code">> ] ).
+#{type => string,
+  enum => {<<"INDA">>,<<"INGA">>,<<"CLRG">>},
+  description =>
+      <<"Specifies the method used to settle the credit"
+        " transfer instruction.">>}
+
+```
+
+## Definition objects
+
+The set of object keys used in type definitions.
+
+```
+Definition_names = lists:sort(maps:keys(maps:get(<<"definitions">>,Schema))).
+[<<".Document">>,
+ <<"AccountIdentification4Choice">>,
+ <<"AccountSchemeName1Choice">>,
+ <<"ActiveCurrencyAndAmount">>,
+ <<"ActiveCurrencyCode">>,
+ <<"ActiveOrHistoricCurrencyAndAmount">>,
+ <<"ActiveOrHistoricCurrencyCode">>,
+ <<"AddressType2Code">>,
+ <<"AddressType3Choice">>,
+ <<"AmendmentInformationDetails13">>,
+ <<"AnyBICDec2014Identifier">>,
+ <<"Authorisation1Choice">>,
+ <<"Authorisation1Code">>,
+ <<"BICFIDec2014Identifier">>,
+ <<"BaseOneRate">>,
+ <<"BatchBookingIndicator">>,
+ <<"BranchAndFinancialInstitutionIdentification6">>,
+ <<"BranchData3">>,
+ <<"CashAccount38">>,
+ <<"CashAccountType2Choice">>,
+ <<"CategoryPurpose1Choice">>,
+ <<"ChargeBearerType1Code">>,
+ <<"Charges7">>,
+ <<"ClearingChannel2Code">>,
+ <<"ClearingSystemIdentification2Choice">>,
+ <<"ClearingSystemIdentification3Choice">>,
+ <<"ClearingSystemMemberIdentification2">>,
+ <<"Contact4">>,
+ <<"CountryCode">>,
+ <<"CreditDebitCode">>,
+ <<"CreditorReferenceInformation2">>,
+ <<"CreditorReferenceType1Choice">>,
+ <<"CreditorReferenceType2">>,
+ <<"DateAndPlaceOfBirth1">>,
+ <<"DatePeriod2">>,
+ <<"DecimalNumber">>,
+ <<"DirectDebitTransaction10">>,
+ <<"DirectDebitTransactionInformation24">>,
+ <<"DiscountAmountAndType1">>,
+ <<"DiscountAmountType1Choice">>,
+ <<"DocumentAdjustment1">>,
+ <<"DocumentLineIdentification1">>,
+ <<"DocumentLineInformation1">>,
+ <<"DocumentLineType1">>,
+ <<"DocumentLineType1Choice">>,
+ <<"DocumentType3Code">>,
+ <<"DocumentType6Code">>,
+ <<"Exact2NumericText">>,
+ <<"Exact4AlphaNumericText">>,
+ <<"ExternalAccountIdentification1Code">>,
+ <<"ExternalCashAccountType1Code">>,
+ <<"ExternalCashClearingSystem1Code">>,
+ <<"ExternalCategoryPurpose1Code">>,
+ <<"ExternalClearingSystemIdentification1Code">>,
+ <<"ExternalDiscountAmountType1Code">>,
+ <<"ExternalDocumentLineType1Code">>,
+ <<"ExternalFinancialInstitutionIdentification1Code">>,
+ <<"ExternalGarnishmentType1Code">>,
+ <<"ExternalLocalInstrument1Code">>,
+ <<"ExternalMandateSetupReason1Code">>,
+ <<"ExternalOrganisationIdentification1Code">>,
+ <<"ExternalPersonIdentification1Code">>,
+ <<"ExternalProxyAccountType1Code">>,
+ <<"ExternalPurpose1Code">>,
+ <<"ExternalServiceLevel1Code">>,
+ <<"ExternalTaxAmountType1Code">>,
+ <<"FinancialIdentificationSchemeName1Choice">>,
+ <<"FinancialInstitutionIdentification18">>,
+ <<"Frequency36Choice">>,
+ <<"Frequency6Code">>,
+ <<"FrequencyAndMoment1">>,
+ <<"FrequencyPeriod1">>,
+ <<"Garnishment3">>,
+ <<"GarnishmentType1">>,
+ <<"GarnishmentType1Choice">>,
+ <<"GenericAccountIdentification1">>,
+ <<"GenericFinancialIdentification1">>,
+ <<"GenericIdentification30">>,
+ <<"GenericOrganisationIdentification1">>,
+ <<"GenericPersonIdentification1">>,
+ <<"GroupHeader94">>,
+ <<"IBAN2007Identifier">>,
+ <<"ISODate">>,
+ <<"ISODateTime">>,
+ <<"LEIIdentifier">>,
+ <<"LocalInstrument2Choice">>,
+ <<"MandateRelatedInformation14">>,
+ <<"MandateSetupReason1Choice">>,
+ <<"Max1025Text">>,
+ <<"Max10Text">>,
+ <<"Max128Text">>,
+ <<"Max140Text">>,
+ <<"Max15NumericText">>,
+ <<"Max16Text">>,
+ <<"Max2048Text">>,
+ <<"Max34Text">>,
+ <<"Max350Text">>,
+ <<"Max35Text">>,
+ <<"Max4Text">>,
+ <<"Max70Text">>,
+ <<"NameAndAddress16">>,
+ <<"NamePrefix2Code">>,
+ <<"Number">>,
+ <<"OrganisationIdentification29">>,
+ <<"OrganisationIdentificationSchemeName1Choice">>,
+ <<"OtherContact1">>,
+ <<"Party38Choice">>,
+ <<"PartyIdentification135">>,
+ <<"PaymentIdentification7">>,
+ <<"PaymentTypeInformation27">>,
+ <<"PercentageRate">>,
+ <<"PersonIdentification13">>,
+ <<"PersonIdentificationSchemeName1Choice">>,
+ <<"PhoneNumber">>,
+ <<"PostalAddress24">>,
+ <<"PreferredContactMethod1Code">>,
+ <<"Priority2Code">>,
+ <<"Priority3Code">>,
+ <<"ProxyAccountIdentification1">>,
+ <<"ProxyAccountType1Choice">>,
+ <<"Purpose2Choice">>,
+ <<"ReferredDocumentInformation7">>,
+ <<"ReferredDocumentType3Choice">>,
+ <<"ReferredDocumentType4">>,
+ <<"RegulatoryAuthority2">>,
+ <<"RegulatoryReporting3">>,
+ <<"RegulatoryReportingType1Code">>,
+ <<"RemittanceAmount2">>,
+ <<"RemittanceAmount3">>,
+ <<"RemittanceInformation16">>,
+ <<"RemittanceLocation7">>,
+ <<"RemittanceLocationData1">>,
+ <<"RemittanceLocationMethod2Code">>,
+ <<"SequenceType3Code">>,
+ <<"ServiceLevel8Choice">>,
+ <<"SettlementDateTimeIndication1">>,
+ <<"SettlementInstruction8">>,
+ <<"SettlementMethod2Code">>,
+ <<"StructuredRegulatoryReporting3">>,
+ <<"StructuredRemittanceInformation16">>,
+ <<"SupplementaryData1">>,
+ <<"SupplementaryDataEnvelope1">>,
+ <<"TaxAmount2">>,
+ <<"TaxAmountAndType1">>,
+ <<"TaxAmountType1Choice">>,
+ <<"TaxAuthorisation1">>,
+ <<"TaxInformation7">>,
+ <<"TaxParty1">>,
+ <<"TaxParty2">>,
+ <<"TaxPeriod2">>,
+ <<"TaxRecord2">>,
+ <<"TaxRecordDetails2">>,
+ <<"TaxRecordPeriod1Code">>,
+ <<"TrueFalseIndicator">>,
+ <<"UUIDv4Identifier">>,
+ <<"pacs.003.001.08-FIToFICustomerDirectDebitV08">>]
+```
+
+
+All possible fields of each type definition:
+
+```
+Definitions = maps:get(<<"definitions">>,Schema).
+
+length(maps:keys(Definitions)).
+156
+
+lists:foldl(
+  fun (I,O) -> maps:merge_with(
+    fun (_,N,M) -> N + M end,
+    O,
+    maps:fold(
+      fun (K,_,O) -> O#{ K => 1 } end, % set all initial values to one.
+      #{},
+      maps:get(I,Definitions) ) ) end,
+  #{},
+  maps:keys(Definitions) ).
+
+#{ type => 155,
+   enum => 17,
+   description => 155,
+   pattern => 12,
+   <<"$ref">> => 1,
+   <<"additionalProperties">> => 65,
+   <<"maxLength">> => 28,
+   <<"minLength">> => 28,
+   <<"minimum">> => 2,
+   <<"oneOf">> => 24,
+   <<"properties">> => 65,
+   <<"required">> => 33 }
+```
+
+The `"$ref"` key only occurs once.  The remainaing
+definition count is 155.  Every definition has a `type` and
+a `description`.
+
+```
+maps:get(<<".Document">>,Definitions).
+#{<<"$ref">> =>
+      <<"#/definitions/pacs.003.001.08-FIToFICustomerDirectDebitV08">>}
+```
+
+
+
+
+```
+Set_of_types = lists:foldl(
+  fun (I,O) -> maps:merge_with(
+    fun (_,N,M) when is_list(N) -> [M|N];
+        (_,N,M) -> [M,N] end,
+    O,
+    maps:get(I,Definitions) ) end,
+  #{},
+  maps:keys(Definitions) ).
+```
+
+
+
+These are the JSON types:
+
+```
+lists:uniq(
+  lists:sort(
+    maps:get(type,Set_of_types) ) ).
+[ boolean,
+  number,
+  object,
+  string ]
+```
+
+JSON object are specifed to have either a strict set of
+field names, or to be a choice of alternate fields
+("oneOf"), or in the case of `"SupplementaryDataEnvelope1"`
+to have unspecified fields:
+
+```
+lists:foldl(
+fun (I,O) ->
+  case maps:get(I,Definitions) of
+    #{ type := object, <<"properties">> := _ } -> O;
+    #{ type := object, <<"oneOf">> := _ } -> O;
+    #{ type := object }=X -> O#{ I => X };
+    #{ } -> O end end,
+#{},
+maps:keys(Definitions) ).
+
+#{<<"SupplementaryDataEnvelope1">> =>
+  #{type => object,
+    description =>
+        <<"Technical component that contains the validated supplementary"
+          " data information. This technical envelope allows to segregate"
+          " the supplementary data information from any other information.">>}}
+```
+
+The choice in `"oneOf"` type definitions is an array of
+types, usually a JSON object.
+
+
+The other type definition offering a choice of possible
+values is the `"enum"` that usually offers a set of JSON
+string values.
+
+```
+lists:uniq(
+  lists:sort(
+    maps:get(enum,Set_of_types) ) ).
+[{<<"DBIT">>,<<"CRDT">>},
+ {<<"HIGH">>,<<"NORM">>},
+ {<<"CRED">>,<<"DEBT">>,<<"BOTH">>},
+ {<<"INDA">>,<<"INGA">>,<<"CLRG">>},
+ {<<"URGT">>,<<"HIGH">>,<<"NORM">>},
+ {<<"AUTH">>,<<"FDET">>,<<"FSUM">>,<<"ILEV">>},
+ {<<"DEBT">>,<<"CRED">>,<<"SHAR">>,<<"SLEV">>},
+ {<<"RTGS">>,<<"RTNS">>,<<"MPNS">>,<<"BOOK">>},
+ {<<"DOCT">>,<<"MIST">>,<<"MISS">>,<<"MADM">>,<<"MIKS">>},
+ {<<"FRST">>,<<"RCUR">>,<<"FNAL">>,<<"OOFF">>,<<"RPRE">>},
+ {<<"LETT">>,<<"MAIL">>,<<"PHON">>,<<"FAXX">>,<<"CELL">>},
+ {<<"FAXI">>,<<"EDIC">>,<<"URID">>,<<"EMAL">>,'POST',<<"SMSM">>},
+ {<<"HOME">>,<<"BIZZ">>,<<"ADDR">>,<<"PBOX">>,<<"MLTO">>,<<"DLVY">>},
+ {<<"RADM">>,<<"RPIN">>,<<"FXDR">>,<<"DISP">>,<<"PUOR">>,<<"SCOR">>},
+ {<<"YEAR">>,<<"MNTH">>,<<"QURT">>,<<"MIAN">>,<<"WEEK">>,
+  <<"DAIL">>,<<"ADHO">>,<<"INDA">>,<<"FRTN">>},
+ {<<"MSIN">>,<<"CNFA">>,<<"DNFA">>,<<"CINV">>,<<"CREN">>,
+  <<"DEBN">>,<<"HIRI">>,<<"SBIN">>,<<"CMCN">>,<<"SOAC">>,
+  <<"DISP">>,<<"PUOR">>,<<"BOLD">>,<<"VCHR">>,<<"AROI">>,
+  <<"TSUT">>},
+ {<<"MM01">>,<<"MM02">>,<<"MM03">>,<<"MM04">>,<<"MM05">>,
+  <<"MM06">>,<<"MM07">>,<<"MM08">>,<<"MM09">>,<<"MM10">>,
+  <<"MM11">>,<<"MM12">>,<<"QTR1">>,<<"QTR2">>,<<"QTR3">>,
+  <<"QTR4">>,<<"HLF1">>,<<"HLF2">>}]
+```
+
+
+
+```
+lists:uniq(
+  lists:sort(
+    maps:get(pattern,Set_of_types) ) ).
+[<<"^+[0-9]{1,3}-[0-9()+-]{1,30}$">>,
+ <<"^[0-9]{1,15}$">>,
+ <<"^[0-9]{2}$">>,
+ <<"^[A-Z0-9]{18,18}[0-9]{2,2}$">>,
+ <<"^[A-Z0-9]{4,4}[A-Z]{2,2}[A-Z0-9]{2,2}([A-Z0-9]{3,3}){0,1}$">>,
+ <<"^[A-Z]{2,2}$">>,
+ <<"^[A-Z]{2,2}[0-9]{2,2}[a-zA-Z0-9]{1,30}$">>,
+ <<"^[A-Z]{3,3}$">>,
+ <<"^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$">>,
+ <<"^[a-zA-Z0-9]{4}$">>]
+```
+
+
+All JSON object types have a set of properties that specify
+the field name and refer to a type definition:
+
+
+lists:uniq(
+  lists:sort(
+    maps:get(<<"properties">>,Set_of_types) ) ).
+
+
+
+
+lists:uniq(
+  lists:sort(
+    maps:get(<<"additionalProperties">>,Set_of_types) ) ).
+[false]
+
+
+
+
+
+
+
+
+
+# Further investigation
+
+
+## XML processing instructions
+
+* [XML processing instructions](https://en.wikipedia.org/wiki/Processing_Instruction)
+
+>  "A processing instruction (PI) is an SGML and XML node type, which may
+>  occur anywhere in a document, intended to carry instructions to the
+>  application."
+
+The meaning if "instructions to the application" is given
+an example of use with PHP:
+
+```
+<!DOCTYPE html>
+<html>
+<body>
+ 
+<?php
+echo "My first PHP script!";
+?>
+
+</body>
+</html>
+```
+
+Here the `<?php ...  ?>` element is replaced with the
+result of running the content taken as PHP script fragment.
+
+This could be an option for describing insertions and value
+field locationss in XML docs.
+
+I've not yet noticed an equivalent language feature for e.g. JSON.
+

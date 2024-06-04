@@ -369,6 +369,8 @@ restore(In) -> In.
 esc(Out,[]) -> Out;
 esc(Out,[In|Rest]) ->
   case In of
+    << >> ->
+      esc(Out,Rest);
     << $b, Tail/binary >> ->
       esc(<< Out/binary, ?backspace, Tail/binary >>, Rest);
     << $f, Tail/binary >> ->
@@ -386,7 +388,9 @@ esc(Out,[In|Rest]) ->
       H = int4(D),
       << Codepoint:16 >> = << E:4,F:4,G:4,H:4 >>,
       Unicode = unicode:characters_to_binary([Codepoint]),
-      esc(<< Out/binary, Unicode/binary, Tail/binary >>, Rest) end.
+      esc(<< Out/binary, Unicode/binary, Tail/binary >>, Rest);
+    << X, Tail/binary >> ->
+      esc(<< Out/binary, X, Tail/binary >>, Rest) end.
 
 int4(X) when $0 =< X, X =< $9 -> X - $0;
 int4(X) when $A =< X, X =< $F -> 10 + X - $A;

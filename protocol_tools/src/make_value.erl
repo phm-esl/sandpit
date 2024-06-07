@@ -165,24 +165,24 @@ gen_range(Pos,Pattern,Out) when Pos < size(Pattern) ->
     << _:Pos/binary, $], _/binary >> ->
       {Pos + 1, fun () -> pick_random(Out) end};
     << _:Pos/binary, $-, $[, _/binary >> ->
-      negate_range(Pos + 2,Pattern,Out);
+      subtract_range(Pos + 2,Pattern,Out);
     << _:Pos/binary, C, _/binary >> ->
       gen_range(Pos + 1, Pattern,[C|Out]) end.
 
 gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
 gen_seq(B,B,Out) -> [B|Out].
 
-negate_range(Pos,Pattern,Out) ->
-  negate_range(Pos,Pattern,lists:usort(Out),[]).
+subtract_range(Pos,Pattern,Out) ->
+  subtract_range(Pos,Pattern,lists:usort(Out),[]).
 
-negate_range(Pos,Pattern,Within,[B,$-,A|Without]) ->
-  negate_range(Pos,Pattern,Within,gen_seq(A,B,Without));
+subtract_range(Pos,Pattern,Within,[B,$-,A|Without]) ->
+  subtract_range(Pos,Pattern,Within,gen_seq(A,B,Without));
 
-negate_range(Pos,Pattern,Within,Without) ->
+subtract_range(Pos,Pattern,Within,Without) ->
   % parse pattern to remove from the Out list any characters that are negated.
   case Pattern of
     << _:Pos/binary, $\\, A, _/binary >> ->
-      negate_range(Pos,Pattern,Within,[A|Without]);
+      subtract_range(Pos,Pattern,Within,[A|Without]);
     << _:Pos/binary, $-, $[, _/binary >> ->
       % TODO: nested character class subtraction...
       throw( 'TODO' );
@@ -192,7 +192,7 @@ negate_range(Pos,Pattern,Within,Without) ->
       io:format("Within = ~p.~nWithout = ~p~nOut = ~p.~n",[Within,Without,Out]),
       {Pos + 2, fun () -> pick_random(Out) end};
     << _:Pos/binary, C, _/binary >> ->
-      negate_range(Pos + 1, Pattern,Within,[C|Without]) end.
+      subtract_range(Pos + 1, Pattern,Within,[C|Without]) end.
 
 
 

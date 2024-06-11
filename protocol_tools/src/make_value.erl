@@ -298,7 +298,7 @@ gen_dot_char() ->
 %      NO: including shorthands,
 %      YES: ranges and
 %      YES: negated classes.
-%    YES: Character class subtraction (to one nested level).
+%    YES: Character class subtraction, with nested subtractions.
 %    YES: The dot, which matches any character except line breaks.
 %    YES: Alternation and groups.
 %    YES: Greedy quantifiers ?, *, + and {n,m}

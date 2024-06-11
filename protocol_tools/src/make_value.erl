@@ -1,5 +1,7 @@
 -module(make_value).
 
+-compile([export_all]).
+
 -export([test/0]).
 
 -export(
@@ -90,6 +92,7 @@ parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
 
     << _:Pos/binary, $[, $^, _/binary >> -> % negated set
       throw(negated_character_set_not_implemented);
+
     << _:Pos/binary, $[, _/binary >> -> % character set
       {End,Gen} = gen_range(Pos + 1,Pattern),
       parse_pattern(End,Pattern,[Gen|Out]);
@@ -152,47 +155,46 @@ gen_group(Pos,Pattern) ->
   {End,Gen} = parse_pattern(Pos,Pattern,[]),
   {End,fun () -> generate(Gen) end}.
 
-gen_range(Pos,Pattern) -> gen_range(Pos,Pattern,[]).
+gen_range(Pos,Pattern) ->
+  Ranges = [{true,[]}], % true is include, false is exclude.
+  gen_range(Pos,Pattern,Ranges).
 
-gen_range(Pos,Pattern,[B,$-,A|Out]) ->
+gen_range(Pos,Pattern,[{Flag,[B,$-,A|Out]}|Rest]) ->
   % expand shorthand to add to the Out list all characters in the sequence.
-  gen_range(Pos,Pattern,gen_seq(A,B,Out));
+  gen_range(Pos,Pattern,[{Flag,gen_seq(A,B,Out)}|Rest]);
 
-gen_range(Pos,Pattern,Out) when Pos < size(Pattern) ->
+gen_range(Pos,Pattern,Ranges) when Pos < size(Pattern) ->
+  [{Flag,Out}|Rest] = Ranges,
   case Pattern of
     << _:Pos/binary, $\\, A, _/binary >> ->
-      gen_range(Pos + 2,Pattern,[A|Out]);
+      gen_range(Pos + 2,Pattern,[{Flag,[A|Out]}|Rest]);
+
     << _:Pos/binary, $], _/binary >> ->
-      {Pos + 1, fun () -> pick_random(Out) end};
+      finish_range(Pos,Pattern,Ranges);
+
     << _:Pos/binary, $-, $[, _/binary >> ->
-      subtract_range(Pos + 2,Pattern,Out);
+      gen_range(Pos + 2,Pattern,[{not Flag,[]}|Ranges]);
+
     << _:Pos/binary, C, _/binary >> ->
-      gen_range(Pos + 1, Pattern,[C|Out]) end.
+      gen_range(Pos + 1, Pattern,[{Flag,[C|Out]}|Rest]) end.
 
 gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
 gen_seq(B,B,Out) -> [B|Out].
 
-subtract_range(Pos,Pattern,Out) ->
-  subtract_range(Pos,Pattern,lists:usort(Out),[]).
 
-subtract_range(Pos,Pattern,Within,[B,$-,A|Without]) ->
-  subtract_range(Pos,Pattern,Within,gen_seq(A,B,Without));
+finish_range(Pos,Pattern,Ranges) ->
+  finish_each_range(Pos,Pattern,lists:reverse(Ranges),[]).
 
-subtract_range(Pos,Pattern,Within,Without) ->
-  % parse pattern to remove from the Out list any characters that are negated.
+finish_each_range(Pos,_,[],Out) ->
+  {Pos,fun () -> pick_random(Out) end};
+finish_each_range(Pos,Pattern,[{Add,Each}|Ranges],Out) ->
   case Pattern of
-    << _:Pos/binary, $\\, A, _/binary >> ->
-      subtract_range(Pos,Pattern,Within,[A|Without]);
-    << _:Pos/binary, $-, $[, _/binary >> ->
-      % TODO: nested character class subtraction...
-      throw( 'TODO' );
-    << _:Pos/binary, $], $], _/binary >> ->
-      % TODO: support recursion for nesting...
-      Out = lists:subtract(Within,Without),
-      io:format("Within = ~p.~nWithout = ~p~nOut = ~p.~n",[Within,Without,Out]),
-      {Pos + 2, fun () -> pick_random(Out) end};
-    << _:Pos/binary, C, _/binary >> ->
-      subtract_range(Pos + 1, Pattern,Within,[C|Without]) end.
+    << _:Pos/binary, $], _/binary >> when Add ->
+      finish_each_range(Pos + 1,Pattern,Ranges,Out ++ Each);
+    << _:Pos/binary, $], _/binary >> when not Add ->
+      finish_each_range(Pos + 1,Pattern,Ranges,Out -- Each) end.
+
+
 
 
 
@@ -270,7 +272,8 @@ gen_dot_char() ->
     if Out =:= $\n -> Fn(); % Do again if newline. TODO Unicode line breaks?
        true -> Out end end.
 
-
+%
+% Source: https://www.regular-expressions.info/xml.html
 %
 %  XML Schema regular expressions support the following:
 %
@@ -278,7 +281,7 @@ gen_dot_char() ->
 %      NO: including shorthands,
 %      YES: ranges and
 %      NO:  negated classes.
-%    PART: Character class subtraction (to one nested level).
+%    YES: Character class subtraction (to one nested level).
 %    YES: The dot, which matches any character except line breaks.
 %    YES: Alternation and groups.
 %    YES: Greedy quantifiers ?, *, + and {n,m}
@@ -287,7 +290,7 @@ gen_dot_char() ->
 test() ->
   Patterns =
   [ <<"[b-df-hj-np-tv-z]">>, % simple character class ranges
-    <<"[a-z-[aeiou]]">>, % character class subtraction (re:run fails)
+    <<"[\s-~-[0-9A-Za-z-[aeiou]]]">>, % character class subtraction (re:run fails)
 %    <<"<\\i\\c*\\s*>">>, % XML-only shorthand
     <<"wx*">>,
     <<"(wx)*">>,

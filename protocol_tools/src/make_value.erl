@@ -91,7 +91,8 @@ parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
       {Pos + 1,Out};
 
     << _:Pos/binary, $[, $^, _/binary >> -> % negated set
-      throw(negated_character_set_not_implemented);
+      {End,Gen} = negated_range(Pos + 2, Pattern),
+      parse_pattern(End,Pattern,[Gen|Out]);
 
     << _:Pos/binary, $[, _/binary >> -> % character set
       {End,Gen} = gen_range(Pos + 1,Pattern),
@@ -155,38 +156,54 @@ gen_group(Pos,Pattern) ->
   {End,Gen} = parse_pattern(Pos,Pattern,[]),
   {End,fun () -> generate(Gen) end}.
 
-gen_range(Pos,Pattern) ->
-  Ranges = [{true,[]}], % true is include, false is exclude.
-  gen_range(Pos,Pattern,Ranges).
 
-gen_range(Pos,Pattern,[{Flag,[B,$-,A|Out]}|Rest]) ->
+negated_range(Pos,Pattern) -> begin_range(Pos,Pattern,[negated]).
+
+gen_range(Pos,Pattern) -> begin_range(Pos,Pattern,[]).
+
+begin_range(Pos,Pattern,Tail) ->
+  % Boolean true is include, false is exclude.
+  case Pattern of
+    << _:Pos/binary, $], _/binary >> ->
+      % literal ']' included into set
+      gen_each_range(Pos + 1,Pattern,[{true,[$]]}|Tail]);
+    _ -> gen_each_range(Pos,Pattern,[{true,[]}|Tail]) end.
+
+gen_each_range(Pos,Pattern,[{Flag,[B,$-,A|Out]}|Rest]) ->
   % expand shorthand to add to the Out list all characters in the sequence.
-  gen_range(Pos,Pattern,[{Flag,gen_seq(A,B,Out)}|Rest]);
+  gen_each_range(Pos,Pattern,[{Flag,gen_seq(A,B,Out)}|Rest]);
 
-gen_range(Pos,Pattern,Ranges) when Pos < size(Pattern) ->
+gen_each_range(Pos,Pattern,Ranges) when Pos < size(Pattern) ->
   [{Flag,Out}|Rest] = Ranges,
   case Pattern of
     << _:Pos/binary, $\\, A, _/binary >> ->
-      gen_range(Pos + 2,Pattern,[{Flag,[A|Out]}|Rest]);
+      gen_each_range(Pos + 2,Pattern,[{Flag,[A|Out]}|Rest]);
 
     << _:Pos/binary, $], _/binary >> ->
       finish_range(Pos,Pattern,Ranges);
 
     << _:Pos/binary, $-, $[, _/binary >> ->
-      gen_range(Pos + 2,Pattern,[{not Flag,[]}|Ranges]);
+      gen_each_range(Pos + 2,Pattern,[{not Flag,[]}|Ranges]);
 
     << _:Pos/binary, C, _/binary >> ->
-      gen_range(Pos + 1, Pattern,[{Flag,[C|Out]}|Rest]) end.
+      gen_each_range(Pos + 1, Pattern,[{Flag,[C|Out]}|Rest]) end.
 
 gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
 gen_seq(B,B,Out) -> [B|Out].
 
-
 finish_range(Pos,Pattern,Ranges) ->
-  finish_each_range(Pos,Pattern,lists:reverse(Ranges),[]).
+  case lists:reverse(Ranges) of
+    [negated|Char_set] ->
+      {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
+      % Negated sets are strict printable ASCII, for now...
+      Negated = gen_seq(32,127,[]) -- Out,
+      {End,fun () -> pick_random(Negated) end};
+     Char_set ->
+      {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
+      {End,fun () -> pick_random(Out) end} end.
 
 finish_each_range(Pos,_,[],Out) ->
-  {Pos,fun () -> pick_random(Out) end};
+  {Pos,Out};
 finish_each_range(Pos,Pattern,[{Add,Each}|Ranges],Out) ->
   case Pattern of
     << _:Pos/binary, $], _/binary >> when Add ->
@@ -280,7 +297,7 @@ gen_dot_char() ->
 %    Character classes,
 %      NO: including shorthands,
 %      YES: ranges and
-%      NO:  negated classes.
+%      YES: negated classes.
 %    YES: Character class subtraction (to one nested level).
 %    YES: The dot, which matches any character except line breaks.
 %    YES: Alternation and groups.
@@ -292,6 +309,9 @@ test() ->
   [ <<"[b-df-hj-np-tv-z]">>, % simple character class ranges
     <<"[\s-~-[0-9A-Za-z-[aeiou]]]">>, % character class subtraction (re:run fails)
 %    <<"<\\i\\c*\\s*>">>, % XML-only shorthand
+    <<"[]]">>,
+    <<"[^]]">>,
+    <<"[^0-9A-Za-z]">>,
     <<"wx*">>,
     <<"(wx)*">>,
     <<"wx+">>,

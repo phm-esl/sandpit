@@ -98,7 +98,6 @@ parse_pattern(Pos,Pattern,Out) when Pos < size(Pattern) ->
       {End,Gen} = gen_range(Pos + 1,Pattern),
       parse_pattern(End,Pattern,[Gen|Out]);
     << _:Pos/binary, ${, _/binary >> -> % repetition range
-      ?log("hd(Out) -> ~p.~n",[hd(Out)]),
       {End,Gen} = gen_repeat(Pos + 1,Pattern,hd(Out)),
       parse_pattern(End,Pattern,[Gen|tl(Out)]);
 
@@ -171,7 +170,8 @@ begin_range(Pos,Pattern,Tail) ->
 
 gen_each_range(Pos,Pattern,[{Flag,[B,$-,A|Out]}|Rest]) ->
   % expand shorthand to add to the Out list all characters in the sequence.
-  gen_each_range(Pos,Pattern,[{Flag,gen_seq(A,B,Out)}|Rest]);
+  % Add one because Min =< range < Max in number_set.
+  gen_each_range(Pos,Pattern,[{Flag,[{A,B + 1}|Out]}|Rest]);
 
 gen_each_range(Pos,Pattern,Ranges) when Pos < size(Pattern) ->
   [{Flag,Out}|Rest] = Ranges,
@@ -188,28 +188,31 @@ gen_each_range(Pos,Pattern,Ranges) when Pos < size(Pattern) ->
     << _:Pos/binary, C, _/binary >> ->
       gen_each_range(Pos + 1, Pattern,[{Flag,[C|Out]}|Rest]) end.
 
-gen_seq(A,B,Out) when A < B -> gen_seq(A + 1, B, [A|Out]);
-gen_seq(B,B,Out) -> [B|Out].
-
 finish_range(Pos,Pattern,Ranges) ->
   case lists:reverse(Ranges) of
     [negated|Char_set] ->
       {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
       % Negated sets are strict printable ASCII, for now...
-      Negated = gen_seq(32,127,[]) -- Out,
-      {End,fun () -> pick_random(Negated) end};
+      Negated = number_set:remove(Out,[{32,128}]),
+      Gen = fun () -> pick_from_range(pick_random(Negated)) end,
+      {End,Gen};
      Char_set ->
       {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
-      {End,fun () -> pick_random(Out) end} end.
+      Gen = fun () -> pick_from_range(pick_random(Out)) end,
+      {End,Gen} end.
 
 finish_each_range(Pos,_,[],Out) ->
   {Pos,Out};
 finish_each_range(Pos,Pattern,[{Add,Each}|Ranges],Out) ->
   case Pattern of
     << _:Pos/binary, $], _/binary >> when Add ->
-      finish_each_range(Pos + 1,Pattern,Ranges,Out ++ Each);
+      finish_each_range(Pos + 1,Pattern,Ranges,number_set:insert(Each,Out));
     << _:Pos/binary, $], _/binary >> when not Add ->
-      finish_each_range(Pos + 1,Pattern,Ranges,Out -- Each) end.
+      finish_each_range(Pos + 1,Pattern,Ranges,number_set:remove(Each,Out)) end.
+
+% NOTE: result excludes Max.
+% Low =< pick_from_range(Range) < High
+pick_from_range({Low,High}) -> Low + rand:uniform(High - Low) - 1.
 
 
 
@@ -285,7 +288,7 @@ pick_random(Choice) when is_list(Choice) ->
 gen_dot_char() ->
   % TODO: Unicode UTF8 byte sequences
   fun Fn() ->
-    Out = random_integer($\s,$~),
+    Out = pick_from_range({32,128}), % ASCII printable character range
     if Out =:= $\n -> Fn(); % Do again if newline. TODO Unicode line breaks?
        true -> Out end end.
 

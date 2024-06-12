@@ -1,7 +1,8 @@
 -module(schema_xsd).
 
 -export(
- [ generate_from_XSD_file/1
+ [ schema_from_file/1
+ , generate_from_XSD_file/1
  , generate_from_schema/2
  , raw_text/1
  , from_document/1
@@ -27,6 +28,15 @@ to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
 %%%   document with #element{} records.
 %%%
 generate_from_XSD_file(File_name) ->
+  {Namespace,Root_name,Root_type,Schema} = schema_from_file(File_name),
+  Top = generate_from_schema(Root_type,Schema),
+  [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
+    #element{
+      name = Root_name,
+      attributes = #{ <<"xmlns">> => Namespace },
+      content = Top } ].
+
+schema_from_file(File_name) ->
   {ok,Bin} = file:read_file(File_name),
   Document = decode_xsd(Bin),
   Trimmed = trim_namespace(Document),
@@ -35,13 +45,7 @@ generate_from_XSD_file(File_name) ->
   #{ <<"name">> := Root_name, <<"type">> := Root_type } = Root,
   Namespace = maps:get(<<"targetNamespace">>,Attrib),
   Schema = from_document(Trimmed),
-  Top = generate_from_schema(Root_type,Schema),
-  [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
-    #element{
-      name = Root_name,
-      attributes = #{ <<"xmlns">> => Namespace },
-      content = Top } ].
-
+  {Namespace,Root_name,Root_type,Schema}.
 
 
 
@@ -87,7 +91,7 @@ generate_from_typedef(Typedef,Schema) ->
       Right = to_binary(Fract),
       Pattern = << "([1-9][0-9]{0,",
                    Left/binary,
-                   "}).[0-9]{0,",
+                   "})\\.[0-9]{0,",
                    Right/binary,
                    "}" >>,
       make_value:from_regexp(Pattern) end.

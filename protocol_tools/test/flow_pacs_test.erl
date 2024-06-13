@@ -2,6 +2,7 @@
 
 -export(
   [ test/0
+  , test_insertion/0
   , test_dir/0
   , test_seek_end/0
   , test_remap/0
@@ -63,6 +64,29 @@ test() ->
       'TwnNm'],
   TwnNm = value_of(Path,Values),
   {{Path,TwnNm},Out}.
+
+test_insertion() ->
+  PACS_008 = generate_pacs_008(),
+  file:write_file("original.xml",PACS_008), % write document to file for debugging
+
+  Decoded = codec_xml:decode(PACS_008),
+  Extract_008 = extraction_maps(pacs_008),
+  PACS_008 = test_insert_loop(
+    codec_xml:encode(Decoded,Extract_008),
+    fun (I) -> I end),
+  Modified = test_insert_loop(
+    codec_xml:encode(Decoded,Extract_008),
+    fun (_) -> <<"******* CHANGED VALUE *******">> end),
+  file:write_file("modified.xml",Modified). % write document to file for debugging
+
+test_insert_loop(In,Switch) ->
+  case In of
+    {Fn,Value,Atom} when is_function(Fn) ->
+      ?log("Atom = ~p.~n\tValue = ~p.~n",[Atom,Value]),
+      test_insert_loop(Fn(Switch(Value)),Switch); % Not modifying the Value
+    Out -> Out end.
+
+
 
 %%%
 %%%   Digging into a nested map of key-value pairs:

@@ -2,6 +2,7 @@
 
 -export(
  [ encode/1
+ , encode/2
  , decode/1
  , decode_hook/1 ]).
 
@@ -43,38 +44,84 @@
     attributes = #{},
     content = [] }).
 
--define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+%-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
 
 
-encode(In) -> to_binary(encode_elements(In)).
+
+encode(In) -> encode(In,#{}).
+
+encode(In,Map) ->
+  Done = fun (Out) -> to_binary(Out) end,
+  Trail = {Map,[]},
+  encode_cps(Done,Trail,In).
+
+encode_list_cps(Done,Trail,In) ->
+  encode_list_cps(Done,Trail,In,[]).
+
+encode_list_cps(Done,_,[],Out) ->
+  Done(lists:reverse(Out));
+encode_list_cps(Done,Trail,[Each|Rest],Out) ->
+  Back = fun (Fill) -> encode_list_cps(Done,Trail,Rest,[Fill|Out]) end,
+  encode_cps(Back,Trail,Each).
+
+encode_cps(Done,_,Fill) when is_binary(Fill) ->
+  Done(Fill);
+encode_cps(Done,Trail,Content) when is_list(Content) ->
+  encode_list_cps(Done,Trail,Content);
+encode_cps(Done,Trail,#element{} = Element) ->
+  Attr = encode_attributes(Element),
+  #element{ name = Name, content = Content } = Element,
+
+  Empty = fun () ->
+    Done(<< ?less_than, Name/binary, Attr/binary, ?empty_element >>) end,
+
+  Continue = fun (In) ->
+    case In of
+      empty -> Empty();
+      [] -> Empty();
+      _ ->
+        Next = fun (Enc) ->
+          Fill = to_binary(Enc),
+          Done(<< ?less_than, Name/binary, Attr/binary, ?greater_than,
+                  Fill/binary,
+                  ?end_tag, Name/binary, ?greater_than >>) end,
+        encode_cps(Next,Trail,In) end end,
+
+  case to_atom(trim(Name)) of
+    [] -> Continue(Content);
+    [Atom] ->
+      {Map,Where} = Trail,
+      Here = [Atom|Where],
+      case Map of
+        #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
+          encode_cps(Continue,{Into,Here},Content);
+        #{ Atom := _ } ->
+          {Continue,Content,lists:reverse(Here)}; % return control to calling context
+        #{ } -> Continue(Content) end end;
+
+
+encode_cps(Done,_,{prolog,Prolog}) ->
+  Done(<< "<?xml", Prolog/binary, "?>" >>);
+encode_cps(Done,_,{'CDATA',Cdata}) ->
+  Done(<< "<![CDATA[", Cdata/binary, "]]>" >>).
 
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
 to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
 
-encode_elements([]) -> [];
-encode_elements([Head|Tail]) -> [encode_elements(Head)|encode_elements(Tail)];
-encode_elements(Binary) when is_binary(Binary) -> Binary;
-encode_elements(#element{} = Element) ->
-  Attr = encode_attributes(Element),
-  case Element of
-    #element{ name = Name, content = empty} ->
-      [ ?less_than, Name, Attr, ?empty_element ];
-    #element{ name = Name, content = [] } ->
-      [ ?less_than, Name, Attr, ?empty_element ];
-    #element{ name = Name, content = Content } ->
-      Fill = encode_elements(Content),
-      [ ?less_than, Name, Attr, ?greater_than,
-        Fill,
-        ?end_tag, Name, ?greater_than ] end;
-encode_elements({prolog,Prolog}) ->
-  [ "<?xml", Prolog, "?>" ];
-encode_elements({'CDATA',Cdata}) ->
-  [ "<![CDATA[", Cdata, "]]>" ].
+trim(Bin) when is_binary(Bin) ->
+  lists:last(binary:split(Bin,<<$:>>,[global])).
+
+to_atom(Bin) when is_binary(Bin) ->
+  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
+  catch error:badarg -> [] end.
+
+
 
 encode_attributes(Element) ->
   Attr = Element#element.attributes,
-  maps:fold(fun encode_each_attr/3,[],Attr).
+  to_binary(maps:fold(fun encode_each_attr/3,[],Attr)).
 
 encode_each_attr(Name,Value,Out) ->
   Quote = quote_value(Value),

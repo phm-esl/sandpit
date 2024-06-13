@@ -4,7 +4,8 @@
   [ test/0
   , test_dir/0
   , test_seek_end/0
-  , test_remap/0 ] ).
+  , test_remap/0
+  , test_generator_speed/0 ] ).
 
 %%%
 %%%   TODO: Either use a map instead of record, or move
@@ -265,3 +266,37 @@ insert_values(#element{} = Element,Values) ->
           Element#element{ attributes = Attr, content = Content };
         #{ } -> Element end end;
 insert_values(Other,_) -> Other.
+
+
+
+
+
+
+
+test_generator_speed() -> test_generator_speed("pacs.008").
+
+test_generator_speed(Name) ->
+  Dir = "protocol_tools/priv/",
+  [File_name] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
+  ?log("File_name = ~p.~n",[File_name]),
+  {Namespace,Root_name,Root_type,Schema}
+    = schema_xsd:schema_from_file(Dir ++ File_name),
+  Self = erlang:self(),
+  Test = fun Loop (N) ->
+    receive stop -> Self ! {stopped,N}
+    after 0 ->
+%      codec_xml:decode(
+        codec_xml:encode(
+          [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
+            #element{
+              name = Root_name,
+              attributes = #{ <<"xmlns">> => Namespace },
+              content = schema_xsd:generate_from_schema(Root_type,Schema)
+              } ] ),
+%               ),
+      Loop( N + 1 ) end end,
+  Pid = erlang:spawn(fun () -> Test(0) end),
+  receive after 10000 ->
+    Pid ! stop,
+    receive {stopped,N} -> #{ rate => N / 10.0 }
+    after 10000 -> timeout end end.

@@ -19,6 +19,21 @@
 
 -define(MAX,64).
 
+unicode_range() ->
+  % Excluding modifiers & combining,
+  % TODO: symbols, other languages, Semitic, Arabic, African, American etc...
+  [ {32,128} % ASCII
+  , {16#00a0,16#02b0} % Latin, IPA
+  , {16#0370,16#0400} % Greek, Coptic
+  , {16#0400,16#0500} % Cyrillic
+  , {16#1e00,16#1f00} % Latin extended
+  , {16#3000,16#3040} % Japanese punctuation
+  , {16#3040,16#30a0} % Hiragana
+  , {16#30a0,16#3100} % Katakana
+  , {16#4e00,16#9fb0} % CJK ideographs
+  , {16#ff00,16#fff0} % Romanjii, half-width katakana
+  ].
+
 date_time() ->
   Now = erlang:timestamp(),
   {{Yr,Mo,Dy},{Hr,Mn,Sc}} = calendar:now_to_universal_time(Now),
@@ -59,7 +74,7 @@ boolean() ->
 from_regexp(Pattern) ->
   try
     {_,Generators} = parse_pattern(0,Pattern,[]),
-    erlang:list_to_binary(generate(Generators))
+    unicode:characters_to_binary(generate(Generators))
   catch What:Why:Where ->
     throw(
     #{ pattern => Pattern,
@@ -192,13 +207,13 @@ finish_range(Pos,Pattern,Ranges) ->
   case lists:reverse(Ranges) of
     [negated|Char_set] ->
       {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
-      % Negated sets are strict printable ASCII, for now...
-      Negated = number_set:remove(Out,[{32,128}]),
-      Gen = fun () -> pick_from_range(pick_random(Negated)) end,
+      % Negated sets are subset of printable Unicode, for now...
+      Negated = number_set:remove(Out,unicode_range()),
+      Gen = fun () -> pick_from_range(Negated) end,
       {End,Gen};
      Char_set ->
       {End,Out} = finish_each_range(Pos,Pattern,Char_set,[]),
-      Gen = fun () -> pick_from_range(pick_random(Out)) end,
+      Gen = fun () -> pick_from_range(Out) end,
       {End,Gen} end.
 
 finish_each_range(Pos,_,[],Out) ->
@@ -212,7 +227,10 @@ finish_each_range(Pos,Pattern,[{Add,Each}|Ranges],Out) ->
 
 % NOTE: result excludes Max.
 % Low =< pick_from_range(Range) < High
-pick_from_range({Low,High}) -> Low + rand:uniform(High - Low) - 1.
+pick_from_range(Range) when is_list(Range) ->
+  pick_from_range(pick_random(Range));
+pick_from_range({Low,High}) ->
+  Low + rand:uniform(High - Low) - 1.
 
 
 
@@ -288,7 +306,7 @@ pick_random(Choice) when is_list(Choice) ->
 gen_dot_char() ->
   % TODO: Unicode UTF8 byte sequences
   fun Fn() ->
-    Out = pick_from_range({32,128}), % ASCII printable character range
+    Out = pick_from_range(unicode_range()), % Subset of printable Unicode
     if Out =:= $\n -> Fn(); % Do again if newline. TODO Unicode line breaks?
        true -> Out end end.
 

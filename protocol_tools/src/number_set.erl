@@ -4,14 +4,14 @@
 
 -export(
  [ insert/2
- , remove/2 ] ).
+ , remove/2
+ , is_valid/1 ] ).
 
 -define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
 
 insert([],Set) -> Set;
 insert([Head|Tail],Set) -> insert(Tail,insert(Head,Set));
-insert(Nbr,Set) when is_integer(Nbr) ->
-  insert({Nbr,Nbr + 1},Set);
+insert(Nbr,Set) when is_integer(Nbr) -> insert({Nbr,Nbr + 1},Set);
 insert({Min,Max},Set)
 when is_integer(Min), is_integer(Max), is_list(Set), Min < Max ->
   insert_scan(Min,Max,Set).
@@ -22,13 +22,20 @@ insert_scan(Min,Max,[{Low,_}|_] = Set) when Max < Low ->
   [{Min,Max}|Set]; % lowest
 insert_scan(Min,Max,[{Low,High}|Set]) when High < Min ->
   [{Low,High}|insert_scan(Min,Max,Set)]; % continue...
+
 insert_scan(Min,Max,[{Low,H},{L,High}|Set])
-when Low < Min, Min =< H, L =< Max, Max < High ->
+when Low =< Min, Min =< H, L =< Max, Max =< High ->
   [{Low,High}|Set]; % bridge two ranges
+insert_scan(Min,Max,[{Low,H},{_,High}|Set])
+when Low =< Min, Min =< H, High =< Max ->
+  insert_scan(Min,Max,[{Low,High}|Set]); % bridge two ranges, maybe more...
+
 insert_scan(Min,Max,[{Low,High}|Set]) when Min =< Low, Max =< High ->
   [{Min,High}|Set]; % overlap Low only
+
 insert_scan(Min,Max,[{Low,High}|Set]) when Low =< Min, High =< Max ->
   [{Low,Max}|Set]; % overlap High only
+
 insert_scan(Min,Max,[{Low,High}|_] = Set) when Low =< Min, Max =< High ->
   Set; % overlap inside Low and High
 insert_scan(Min,Max,[{Low,High}|Set]) when Min =< Low, High =< Max ->
@@ -62,8 +69,8 @@ remove_scan(Min,Max,[{Low,High}|Set]) when Min =< High, High =< Max ->
 
 is_valid([]) -> true;
 is_valid([{A,B}]) -> A < B;
-is_valid([{A,B},{C,D}|Set]) ->
-  A < B andalso B < C andalso C < D andalso is_valid([{C,D}|Set]).
+is_valid([{A,B},{C,D}|Set]) when A < B, B < C, C < D -> is_valid([{C,D}|Set]);
+is_valid(_) -> false.
 
 test() ->
   [{5,6}] = insert(5,[]), % highest
@@ -72,6 +79,7 @@ test() ->
   [{1,2},{3,4},{5,6}] = insert(3,[{1,2},{5,6}]), % continue, lowest
   [{1,6},{8,9}] = insert(8,[{1,6}]), % continue, highest
   [{1,9}] = insert(5,[{1,5},{6,9}]), % bridge two ranges
+  [{1,9},{10,14}] = insert({5,9},[{1,5},{6,8},{10,14}]), % bridge two ranges, and more
   [{1,9}] = insert({1,7},[{5,9}]), % overlap Low only
   [{1,9}] = insert({5,9},[{1,7}]), % overlap High only
   [{1,9}] = insert(5,[{1,9}]), % overlap inside Low and High
@@ -90,18 +98,20 @@ test() ->
 
   Set = test_loop(1000,[]),
   Holes = remove(Set,[{0,100}]),
-  [{0,100}] = insert(Set,Holes).
+  [{0,100}] = insert(Set,Holes),
+  ok.
 
 test_loop(0,Set) -> Set;
-test_loop(N,Set) when N > 0 ->
+test_loop(N,Old) when N > 0 ->
   Span = 4,
   Min = random_integer(0,100 - Span),
   Max = Min + random_integer(1,Span),
   Op = random_integer(0,1),
-  if Op =:= 0 -> X = insert({Min,Max},Set);
-     Op =:= 1 -> X = remove({Min,Max},Set) end,
-  Yes = is_valid(X),
-  if Yes -> test_loop(N - 1,X);
-     true -> X end.
+  if Op =:= 0 -> Fn = insert;
+     Op =:= 1 -> Fn = remove end,
+  New = ?MODULE:Fn({Min,Max},Old),
+  Yes = is_valid(New),
+  if Yes -> test_loop(N - 1,New);
+     true -> throw({invalid,#{ Fn => {Min,Max}, old => Old,new => New}}) end.
 
 random_integer(Min,Max) -> Min + rand:uniform(Max - Min + 1) - 1.

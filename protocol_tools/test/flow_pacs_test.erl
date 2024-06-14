@@ -50,16 +50,15 @@ test_multi_values() ->
   Extract =
     #{ 'Envelope' =>
       #{ 'Body' =>
-        #{ 'addRequest' =>
+        #{ {xpath,'addRequest'} => #{
+             attr => #{ <<"language">> => <<"fr">> } },
+           'addRequest' =>
           #{ 'object' =>
             #{ 'svProfile' =>
-              #{ 'infoService' =>
-
-                {match,#{
-                  index => 4,
-                  path => #{
-                    'infoSvcs' =>
-                      {match,#{ index => 2 }} } }} } } } } } },
+              #{ {xpath,'infoService'} => #{ pick => [4,6] },
+                 'infoService' =>
+                 #{ {xpath,'infoSvcs'} => #{ pick => [2,5] },
+                    'infoSvcs' => [] } } } } } } },
 
 
   {Values,Decode} = follow_nested_map(
@@ -127,53 +126,82 @@ follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
   case to_atom(trim(Token)) of
     [Atom] when is_map_key(Atom,Extract) ->
       case Extract of
-        #{ {skip_rest,Atom} := true } ->
-          {_,Next} = seek_end(Hook),
-          follow_nested_map(Next(),Extract,Path);
-
-        #{ Atom := {match,Match} } ->
-          %
-          % Other 'match' criteria can include:
-          % attribute values, content values, etc.
-          %
-          case Match of
-            #{ index := 1, path := Into } ->
-               New = Extract#{ {skip_rest,Atom} => true },
-               follow_nested_map(Fn(),Into,[{Atom,New}|Path]);
-            #{ index := 1 } ->
-               % pick this value
-               {Element,Next} = seek_end(Hook),
-               New = Extract#{ Atom := Element },
-               follow_nested_map(Next(),New,Path);
-            #{ index := Index } when is_integer(Index), Index > 1 ->
-               % continue seeking...
-               {_,Next} = seek_end(Hook),
-               New = Extract#{
-                 Atom := {match,Match#{ index := Index - 1 }} },
-               follow_nested_map(Next(),New,Path) end;
+        #{ {xpath,Atom} := Match, Atom := Into } ->
+          case is_match(Match) of
+            {false,Rematch} ->
+              {_,Next} = seek_end(Hook),
+              New = Extract#{ {xpath,Atom} := Rematch },
+              follow_nested_map(Next(),New,Path);
+            {true,Rematch} when is_map(Into) ->
+              New = Extract#{
+                {xpath,Atom} := Rematch },
+              follow_nested_map(Fn(),Into,[{Atom,New}|Path]);
+            {true,Rematch} when is_list(Into)  ->
+              % collect all matching elements...
+              {Element,Next} = seek_end(Hook),
+              New = Extract#{
+                Atom := [Element|Into],
+                {xpath,Atom} := Rematch },
+              follow_nested_map(Next(),New,Path) end;
         #{ Atom := Into } when is_map(Into) ->
           % dig into the nest
           follow_nested_map(Fn(),Into,[{Atom,Extract}|Path]);
-        #{ Atom := Old } when is_list(Old) ->
+        #{ Atom := Into } when is_list(Into) ->
           % collect all matching elements...
           {Element,Next} = seek_end(Hook),
-          New = [Element|Old],
-          follow_nested_map(Next(),Extract#{ Atom := New },Path);
-        #{ Atom := #element{} } ->
-          % single value selected already
-          {_,Next} = seek_end(Hook),
-          follow_nested_map(Next(),Extract,Path) end;
+          New = [Element|Into],
+          follow_nested_map(Next(),Extract#{ Atom := New },Path) end;
     _ ->
       {#element{ name = Token },Next} = seek_end(Hook),
       follow_nested_map(Next(),Extract,Path) end;
 
 follow_nested_map({Element,Fn},Down,[{Atom,Up}|Path])
-when is_map_key(Atom,Up) ->
-  #element{ name = Token } = Element,
+when is_map(Down), is_map_key(Atom,Up) ->
+  #element{ name = Token, attributes = Attr } = Element,
   case to_atom(trim(Token)) of
     [Atom] ->
-      New = Up#{ Atom := Down },
+      %
+      % Attributes matching the 'xpath' rule are checked here, after the
+      % element is decoded. No match will discard the values from Down.
+      %
+      Yes = case Up of
+        #{ {xpath,Atom} := #{ attr := Match } } -> is_attr_match(Attr,Match);
+        #{ } -> true end,
+      New = if Yes -> Up#{ Atom := reset_index(Down) };
+               true -> Up end,
       follow_nested_map(Fn(),New,Path) end.
+
+
+is_attr_match(A,B) ->
+  maps:fold(
+    fun compare_true/3,
+    true,
+    maps:intersect_with(fun compare_attr/3,A,B) ).
+
+compare_attr(_,K1,K2) -> K1 == K2.
+
+compare_true(_,true,true) -> true;
+compare_true(_,_,_) -> false.
+
+reset_index(In) ->
+  maps:fold(fun reset_index/3,#{},In).
+
+reset_index({xpath,_}=K,#{ index := _ }=V,Out) ->
+  Out#{ K => maps:remove(index,V) };
+reset_index(K,V,Out) -> Out#{ K => V }.
+
+is_match(done) ->
+  {false,done};
+is_match(Match) when not is_map_key(index,Match) ->
+  is_match(Match#{ index => 1 });
+is_match(#{ index := Index } = Match) ->
+  case Match of
+    #{ pick := Pick }
+    when is_integer(Pick), Index == Pick ->
+      {true,Match#{ index := Index + 1 }};
+    #{ pick := Pick } when is_list(Pick) ->
+      {lists:member(Index,Pick),Match#{ index := Index + 1}};
+    #{ } -> {true,Match#{ index := Index + 1 }} end.
 
 
 

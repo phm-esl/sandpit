@@ -7,6 +7,58 @@
   <soapenv:Body>
     <spml:addRequest
      xsi:schemaLocation="urn:siemens:names:prov:gw:SEVAS_SUBSCRIBER:1:0 sevas_subscriber-1.0.xsd"
+     language="fr"
+     returnResultingObject="${returnResultingObject}"
+     requestID="${RANDOM}-${RANDOM}-${RANDOM}"
+     xmlns:spml="urn:siemens:names:prov:gw:SPML:2:0"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <version>SEVAS_SUBSCRIBER_v10</version>
+      <object
+       xsi:type="subscriber:Subscriber"
+       xmlns:subscriber="urn:siemens:names:prov:gw:SEVAS_SUBSCRIBER:1:0">
+        <identifier>${imsi}</identifier>
+        <svProfile>
+          <ban>113512662</ban>
+          <billCycle>22</billCycle>
+          <msisdn>${msisdn}</msisdn>
+          <fupPolicy>725</fupPolicy>
+          <imei>0</imei>
+          <imsi>${imsi}</imsi>
+          <infoService><infoSvcs>I2</infoSvcs></infoService>
+          <infoService><infoSvcs>AUGC</infoSvcs></infoService>
+          <infoService><infoSvcs>BBIB</infoSvcs></infoService>
+          <infoService>
+            <infoSvcs>CLONE UN</infoSvcs>
+            <infoSvcs>CLONE DEUX</infoSvcs>
+            <infoSvcs>CLONE TROIS</infoSvcs>
+            <infoSvcs>CLONE QUATRE</infoSvcs>
+            <infoSvcs>CLONE CINQ</infoSvcs>
+          </infoService>
+          <infoService><infoSvcs>FUP</infoSvcs></infoService>
+          <infoService>
+            <infoSvcs>I0 un</infoSvcs>
+            <infoSvcs>I0 deux</infoSvcs>
+            <infoSvcs>I0 trois</infoSvcs>
+            <infoSvcs>I0 quatre</infoSvcs>
+            <infoSvcs>I0 cinq</infoSvcs>
+          </infoService>
+          <infoService><infoSvcs>MISP</infoSvcs></infoService>
+          <infoService><infoSvcs>MPTY</infoSvcs></infoService>
+          <infoService><infoSvcs>SWAP</infoSvcs></infoService>
+          <infoService><infoSvcs>WIBT</infoSvcs></infoService>
+          <infoService><infoSvcs>WLIST</infoSvcs></infoService>
+          <paymentMethod>postpay</paymentMethod>
+          <pricePlan>X12M24D76</pricePlan>
+          <rttChannel>wh</rttChannel>
+          <voicemailCluster>1</voicemailCluster>
+          <wholesalePartnerId>EEONE</wholesalePartnerId>
+          <SSN>89443001043299046009</SSN>
+          <tree><![CDATA[${tree_data}]]></tree>
+        </svProfile>
+      </object>
+    </spml:addRequest>
+    <spml:addRequest
+     xsi:schemaLocation="urn:siemens:names:prov:gw:SEVAS_SUBSCRIBER:1:0 sevas_subscriber-1.0.xsd"
      language="en_en"
      returnResultingObject="${returnResultingObject}"
      requestID="${RANDOM}-${RANDOM}-${RANDOM}"
@@ -31,9 +83,17 @@
             <infoSvcs>CLONE ONE</infoSvcs>
             <infoSvcs>CLONE TWO</infoSvcs>
             <infoSvcs>CLONE THREE</infoSvcs>
+            <infoSvcs>CLONE FOUR</infoSvcs>
+            <infoSvcs>CLONE FIVE</infoSvcs>
           </infoService>
           <infoService><infoSvcs>FUP</infoSvcs></infoService>
-          <infoService><infoSvcs>I0</infoSvcs></infoService>
+          <infoService>
+            <infoSvcs>I0 one</infoSvcs>
+            <infoSvcs>I0 two</infoSvcs>
+            <infoSvcs>I0 three</infoSvcs>
+            <infoSvcs>I0 four</infoSvcs>
+            <infoSvcs>I0 five</infoSvcs>
+          </infoService>
           <infoService><infoSvcs>MISP</infoSvcs></infoService>
           <infoService><infoSvcs>MPTY</infoSvcs></infoService>
           <infoService><infoSvcs>SWAP</infoSvcs></infoService>

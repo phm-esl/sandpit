@@ -1,7 +1,8 @@
 -module(flow_pacs_test).
 
 -export(
-  [ test/0
+  [ test_multi_values/0
+  , test_extraction/0
   , test_insertion/0
   , test_dir/0
   , test_seek_end/0
@@ -44,8 +45,24 @@ pick_xsd(In) ->
 
 
 
+test_multi_values() ->
+  {ok,Soap_xml} = file:read_file("protocol_tools/priv/OneNDS_addRequest.xml"),
+  Extract =
+    #{ 'Envelope' =>
+      #{ 'Body' =>
+        #{ 'addRequest' =>
+          #{ 'object' =>
+            #{ 'svProfile' =>
+              #{ 'infoService' =>
+                #{ 'infoSvcs' => {match,#{ index => 4 }} } } } } } } },
+  Out = follow_nested_map(
+    codec_xml:decode_hook(Soap_xml),
+    Extract,
+    []),
+  Out.
 
-test() ->
+
+test_extraction() ->
   PACS_008 = generate_pacs_008(),
   file:write_file("tmp.xml",PACS_008), % write document to file for debugging
   Extract_008 = extraction_maps(pacs_008),
@@ -100,20 +117,32 @@ follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
   case to_atom(trim(Token)) of
     [Atom] when is_map_key(Atom,Extract) ->
       case Extract of
+        #{ Atom := {match,Match} } ->
+          case Match of
+            #{ index := Index } when is_integer(Index) ->
+              if Index > 1 ->
+                   % continue seeking...
+                   {_,Next} = seek_end(Hook),
+                   New = {match,Match#{ index := Index - 1 }},
+                   follow_nested_map(Next(),Extract#{ Atom := New },Path);
+                 Index =:= 1 ->
+                   % pick this value
+                   {Element,Next} = seek_end(Hook),
+                   New = Element,
+                   follow_nested_map(Next(),Extract#{ Atom := New },Path) end end;
         #{ Atom := Down } when is_map(Down) ->
-        %  ?log("Atom = ~p.~n\tExtract = ~p.~n\tDown = ~p.~n",
-        %       [Atom,Extract,Down]),
           follow_nested_map(Fn(),Down,[{Atom,Extract}|Path]);
 
         #{ Atom := Old } when is_list(Old) ->
           {Element,Next} = seek_end(Hook),
           New = [Element|Old],
-        %  ?log("Atom = ~p.~n\tExtract = ~p.~n\tNew = ~p.~n",
-        %       [Atom,Extract,New]),
-          follow_nested_map(Next(),Extract#{ Atom := New },Path) end;
+          follow_nested_map(Next(),Extract#{ Atom := New },Path);
+        #{ Atom := #element{} } ->
+          % single value selected already
+          {_,Next} = seek_end(Hook),
+          follow_nested_map(Next(),Extract,Path)
+         end;
     _ ->
-    %  ?log("Token = ~p.~n\tExtract = ~p.~n",
-    %       [Token,Extract]),
       {#element{ name = Token },Next} = seek_end(Hook),
       follow_nested_map(Next(),Extract,Path) end;
 

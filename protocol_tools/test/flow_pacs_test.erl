@@ -174,17 +174,13 @@ when is_map(Down), is_map_key(Atom,Up) ->
 
 is_attr_match(A,B) ->
   maps:fold(
-    fun compare_true/3,
+    fun compare_attr/3,
     true,
     maps:intersect_with(fun compare_attr/3,A,B) ).
 
-compare_attr(_,K1,K2) -> K1 == K2.
+compare_attr(_,V1,V2) -> V1 == V2.
 
-compare_true(_,true,true) -> true;
-compare_true(_,_,_) -> false.
-
-reset_index(In) ->
-  maps:fold(fun reset_index/3,#{},In).
+reset_index(In) -> maps:fold(fun reset_index/3,#{},In).
 
 reset_index({xpath,_}=K,#{ index := _ }=V,Out) ->
   Out#{ K => maps:remove(index,V) };

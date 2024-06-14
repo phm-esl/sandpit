@@ -27,7 +27,11 @@
           <infoService><infoSvcs>I2</infoSvcs></infoService>
           <infoService><infoSvcs>AUGC</infoSvcs></infoService>
           <infoService><infoSvcs>BBIB</infoSvcs></infoService>
-          <infoService><infoSvcs>CLONE</infoSvcs></infoService>
+          <infoService>
+            <infoSvcs>CLONE ONE</infoSvcs>
+            <infoSvcs>CLONE TWO</infoSvcs>
+            <infoSvcs>CLONE THREE</infoSvcs>
+          </infoService>
           <infoService><infoSvcs>FUP</infoSvcs></infoService>
           <infoService><infoSvcs>I0</infoSvcs></infoService>
           <infoService><infoSvcs>MISP</infoSvcs></infoService>

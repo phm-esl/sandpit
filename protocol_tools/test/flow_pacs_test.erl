@@ -54,12 +54,22 @@ test_multi_values() ->
           #{ 'object' =>
             #{ 'svProfile' =>
               #{ 'infoService' =>
-                #{ 'infoSvcs' => {match,#{ index => 4 }} } } } } } } },
-  Out = follow_nested_map(
+
+                {match,#{
+                  index => 4,
+                  path => #{
+                    'infoSvcs' =>
+                      {match,#{ index => 2 }} } }} } } } } } },
+
+
+  {Values,Decode} = follow_nested_map(
     codec_xml:decode_hook(Soap_xml),
     Extract,
     []),
-  Out.
+  Compact = no_space(Decode),
+  Write = codec_xml:encode(Compact),
+  ok = file:write_file("tmp.xml",Write),
+  {Values,Compact}.
 
 
 test_extraction() ->
@@ -117,31 +127,42 @@ follow_nested_map({Token,Fn}=Hook,Extract,Path) when is_binary(Token) ->
   case to_atom(trim(Token)) of
     [Atom] when is_map_key(Atom,Extract) ->
       case Extract of
-        #{ Atom := {match,Match} } ->
-          case Match of
-            #{ index := Index } when is_integer(Index) ->
-              if Index > 1 ->
-                   % continue seeking...
-                   {_,Next} = seek_end(Hook),
-                   New = {match,Match#{ index := Index - 1 }},
-                   follow_nested_map(Next(),Extract#{ Atom := New },Path);
-                 Index =:= 1 ->
-                   % pick this value
-                   {Element,Next} = seek_end(Hook),
-                   New = Element,
-                   follow_nested_map(Next(),Extract#{ Atom := New },Path) end end;
-        #{ Atom := Down } when is_map(Down) ->
-          follow_nested_map(Fn(),Down,[{Atom,Extract}|Path]);
+        #{ {skip_rest,Atom} := true } ->
+          {_,Next} = seek_end(Hook),
+          follow_nested_map(Next(),Extract,Path);
 
+        #{ Atom := {match,Match} } ->
+          %
+          % Other 'match' criteria can include:
+          % attribute values, content values, etc.
+          %
+          case Match of
+            #{ index := 1, path := Into } ->
+               New = Extract#{ {skip_rest,Atom} => true },
+               follow_nested_map(Fn(),Into,[{Atom,New}|Path]);
+            #{ index := 1 } ->
+               % pick this value
+               {Element,Next} = seek_end(Hook),
+               New = Extract#{ Atom := Element },
+               follow_nested_map(Next(),New,Path);
+            #{ index := Index } when is_integer(Index), Index > 1 ->
+               % continue seeking...
+               {_,Next} = seek_end(Hook),
+               New = Extract#{
+                 Atom := {match,Match#{ index := Index - 1 }} },
+               follow_nested_map(Next(),New,Path) end;
+        #{ Atom := Into } when is_map(Into) ->
+          % dig into the nest
+          follow_nested_map(Fn(),Into,[{Atom,Extract}|Path]);
         #{ Atom := Old } when is_list(Old) ->
+          % collect all matching elements...
           {Element,Next} = seek_end(Hook),
           New = [Element|Old],
           follow_nested_map(Next(),Extract#{ Atom := New },Path);
         #{ Atom := #element{} } ->
           % single value selected already
           {_,Next} = seek_end(Hook),
-          follow_nested_map(Next(),Extract,Path)
-         end;
+          follow_nested_map(Next(),Extract,Path) end;
     _ ->
       {#element{ name = Token },Next} = seek_end(Hook),
       follow_nested_map(Next(),Extract,Path) end;
@@ -151,8 +172,6 @@ when is_map_key(Atom,Up) ->
   #element{ name = Token } = Element,
   case to_atom(trim(Token)) of
     [Atom] ->
-    %  ?log("Element = ~p.~n\tAtom = ~p.~n",
-    %    [Element,Atom]),
       New = Up#{ Atom := Down },
       follow_nested_map(Fn(),New,Path) end.
 
@@ -247,6 +266,21 @@ extraction_maps(Type) ->
                #{'Nm' => [],
                  'PstlAdr' => PstlAdr }}}}} end.
 
+no_space(In) when is_list(In) ->
+  no_space(In,[]);
+no_space(In) -> In.
+
+no_space([],Out) ->
+  lists:reverse(Out);
+no_space([#element{} = In|Rest],Out) ->
+  #element{ content = Content } = In,
+  no_space(Rest,[In#element{ content = no_space(Content) }|Out]);
+no_space([Bin|Rest],Out) when is_binary(Bin) ->
+  case binary:replace(Bin,[<<$\n>>,<<$\r>>,<<$\s>>,<<$\t>>],<<>>,[global]) of
+    <<>> -> no_space(Rest,Out);
+    _ -> no_space(Rest,[Bin|Out]) end;
+no_space([In|Rest],Out) ->
+  no_space(Rest,[In|Out]).
 
 
 trim(Bin) when is_binary(Bin) ->

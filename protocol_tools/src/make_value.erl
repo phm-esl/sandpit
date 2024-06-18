@@ -264,6 +264,7 @@ gen_repeat_fun(N,N,Gen) when 0 =< N ->
 gen_repeat_fun(Min,Max,Gen) when 0 =< Min, Min < Max ->
   fun () -> (repeat(Gen))(random_integer(Min,Max)) end.
 
+random_integer(Min,infinity) -> random_integer(Min,?MAX);
 random_integer(Min,Max) -> Min + rand:uniform(Max - Min + 1) - 1.
 
 repeat(Bin) when is_binary(Bin) ->

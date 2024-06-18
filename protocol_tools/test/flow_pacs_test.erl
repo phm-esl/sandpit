@@ -4,6 +4,7 @@
   [ test_multi_values/0
   , test_extraction/0
   , test_insertion/0
+  , test_insertion/1
   , test_dir/0
   , test_seek_end/0
   , test_remap/0
@@ -32,7 +33,7 @@ test_dir() ->
 
 xml_from_xsd(In) ->
   Out = codec_xml:encode(
-    schema_xsd:generate_from_XSD_file(In) ),
+    schema_xsd:generate_from_XSD_file(In,[minimal]) ),
   File_name = In ++ "-output.XML",
   ?log("File_name = ~p.~n",[File_name]),
   ok = file:write_file(File_name,Out).
@@ -72,7 +73,7 @@ test_multi_values() ->
 
 
 test_extraction() ->
-  PACS_008 = generate_pacs_008(),
+  PACS_008 = generate_pacs_008([]),
   file:write_file("tmp.xml",PACS_008), % write document to file for debugging
   Extract_008 = extraction_maps(pacs_008),
   ?log("Extract_008 = ~p.~n",[Extract_008]),
@@ -92,7 +93,12 @@ test_extraction() ->
   {{Path,TwnNm},Out}.
 
 test_insertion() ->
-  PACS_008 = generate_pacs_008(),
+  Extract_008 = extraction_maps(pacs_008),
+  test_insertion([{insertions,Extract_008},minimal]).
+
+test_insertion(Options) ->
+  ?log("Options = ~p.~n",[Options]),
+  PACS_008 = generate_pacs_008(Options),
   file:write_file("original.xml",PACS_008), % write document to file for debugging
 
   Decoded = codec_xml:decode(PACS_008),
@@ -202,7 +208,7 @@ is_match(#{ index := Index } = Match) ->
 
 
 test_seek_end() ->
-  PACS_008 = generate("pacs.008"),
+  PACS_008 = generate("pacs.008",[]),
   file:write_file("tmp.xml",PACS_008),
   Decoded = codec_xml:decode(PACS_008),
   Decoded = seek_end(codec_xml:decode_hook(PACS_008)),
@@ -239,16 +245,16 @@ seek_end(Decoded,[]) when is_list(Decoded) ->
 
 % generate_pacs_003() -> generate("pacs.003").
 
-generate_pacs_008() -> generate("pacs.008").
+generate_pacs_008(Options) -> generate("pacs.008",Options).
 
-generate(Name) ->
+generate(Name,Options) ->
   Dir = "protocol_tools/priv/",
   [File] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
-  generate_from_xsd(Dir ++ File).
+  generate_from_xsd(Dir ++ File,Options).
 
-generate_from_xsd(File_name) ->
+generate_from_xsd(File_name,Options) ->
   codec_xml:encode(
-    schema_xsd:generate_from_XSD_file(File_name) ).
+    schema_xsd:generate_from_XSD_file(File_name,Options) ).
 
 
 
@@ -318,7 +324,7 @@ to_atom(Bin) when is_binary(Bin) ->
 
 
 test_remap() ->
-  Request = generate_pacs_008(),
+  Request = generate_pacs_008([]),
   Extract = extraction_maps(pacs_008),
   {Old,_} = follow_nested_map(
     codec_xml:decode_hook(Request),
@@ -391,7 +397,7 @@ test_generator_speed(Name) ->
   [File_name] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
   ?log("File_name = ~p.~n",[File_name]),
   {Namespace,Root_name,Root_type,Schema}
-    = schema_xsd:schema_from_file(Dir ++ File_name),
+    = schema_xsd:schema_from_file(Dir ++ File_name,[minimal]),
   Self = erlang:self(),
   Test = fun Loop (N) ->
     receive stop -> Self ! {stopped,N}

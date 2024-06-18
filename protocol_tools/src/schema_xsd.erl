@@ -2,11 +2,10 @@
 
 -export(
  [ schema_from_file/1
+ , schema_from_file/2
  , generate_from_XSD_file/1
- , generate_from_schema/2
- , raw_text/1
- , from_document/1
- , trim_namespace/1 ] ).
+ , generate_from_XSD_file/2
+ , generate_from_schema/2 ] ).
 
 %%%
 %%%   TODO: Either use a map instead of record, or move
@@ -17,26 +16,46 @@
     attributes = #{},
     content = [] }).
 
--define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),logger:notice("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
 
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
 to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
 
+valid_options(In) -> valid_options(In,#{}).
+
+valid_options([],Out) -> Out;
+valid_options([{insertions,Insert}|Options],Out) when is_map(Insert) ->
+  %
+  % Preserve optional elements if the Insert map contains values for these.
+  %
+  valid_options(Options,Out#{ {?MODULE,insertions} => Insert });
+valid_options([minimal|Options],Out) ->
+  %
+  % Omit all elements with minOccurs="0", but see 'insertions' above for
+  % exceptions to this.
+  %
+  valid_options(Options,Out#{ {?MODULE,minimal} => true }).
+
 %%%
 %%%   The result is the Erlang term representing an XML
 %%%   document with #element{} records.
 %%%
-generate_from_XSD_file(File_name) ->
-  {Namespace,Root_name,Root_type,Schema} = schema_from_file(File_name),
-  Top = generate_from_schema(Root_type,Schema),
+generate_from_XSD_file(File_name) -> generate_from_XSD_file(File_name,[]).
+
+generate_from_XSD_file(File_name,Options) ->
+  {Namespace,Root_name,Root_type,Schema} = schema_from_file(File_name,Options),
+  Top = generate_from_schema(Root_type,into_insertions(Root_name,Schema)),
   [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
     #element{
       name = Root_name,
       attributes = #{ <<"xmlns">> => Namespace },
       content = Top } ].
 
-schema_from_file(File_name) ->
+schema_from_file(File_name) -> schema_from_file(File_name,[]).
+
+schema_from_file(File_name,Options) ->
+  Valid = valid_options(Options),
   {ok,Bin} = file:read_file(File_name),
   Document = decode_xsd(Bin),
   Trimmed = trim_namespace(Document),
@@ -44,7 +63,7 @@ schema_from_file(File_name) ->
   [Root] = [ X || #element{ name = <<"element">>, attributes = X } <- Content ],
   #{ <<"name">> := Root_name, <<"type">> := Root_type } = Root,
   Namespace = maps:get(<<"targetNamespace">>,Attrib),
-  Schema = from_document(Trimmed),
+  Schema = from_document(Trimmed,Valid),
   {Namespace,Root_name,Root_type,Schema}.
 
 
@@ -55,6 +74,7 @@ generate_from_schema(Type_name,Schema)
 when is_binary(Type_name), is_map(Schema) ->
   Typedef = maps:get({typedef,Type_name},Schema),
   generate_from_typedef(Typedef,Schema).
+
 
 generate_from_typedef(Typedef,Schema) ->
   case Typedef of
@@ -110,8 +130,7 @@ gen_each_attr({attribute,Attr},Schema,Out) ->
 
 generate_sequence(Sequence,Schema) ->
   Each = fun ({element,I},O) ->
-    Element = generate_from_element(I,Schema),
-    [Element|O] end,
+    generate_from_element(I,Schema,O) end,
   lists:reverse(lists:foldl(Each,[],Sequence)).
 
 generate_choice(Choice,Schema) ->
@@ -119,20 +138,63 @@ generate_choice(Choice,Schema) ->
     {element,Pick} -> generate_from_element(Pick,Schema);
     Pick when is_binary(Pick) -> Pick end.
 
+generate_from_element(Element,Schema,Out) when is_list(Out) ->
+  case Element of
+    #{ name := Name, minOccurs := Min, maxOccurs := Max } ->
+      N = repetitions(Name,Min,Max,Schema),
+      generate_from_element(Element,Schema,Out,N);
+    #{ } -> [ generate_from_element(Element,Schema) | Out ] end.
+
+repetitions(Name,Min,Max,Schema) when is_binary(Name) ->
+  case to_atom(Name) of
+    [Atom] -> repetitions(Atom,Min,Max,Schema);
+    [] -> repetitions(Min,Max,Schema) end;
+repetitions(Name,Min,Max,Schema) ->
+  case Schema of
+%%    #{ {?MODULE,insertions} := #{ {xpath,Name} := Xpath } } ->
+%%      % TODO If value Xpath is an index, set Min to value of index
+    #{ {?MODULE,insertions} := #{ Name := _ }, {?MODULE,minimal} := true } ->
+      1;
+    #{ {?MODULE,insertions} := #{ Name := _ } } ->
+      make_value:random_integer(1,Max);
+    #{ } -> repetitions(Min,Max,Schema) end.
+
+repetitions(Min,Max,Schema) ->
+  case Schema of
+    #{ {?MODULE,minimal} := true } -> Min;
+    #{ } -> make_value:random_integer(Min,Max) end.
+
+to_atom(Bin) when is_binary(Bin) ->
+  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
+  catch error:badarg -> [] end.
+
+
+generate_from_element(_,_,Out,0) -> Out;
+generate_from_element(Element,Schema,Out,N) when N > 0 ->
+  Value = generate_from_element(Element,Schema),
+  generate_from_element(Element,Schema,[Value|Out],N - 1).
+
 generate_from_element(Element,Schema) ->
-  Element_name = maps:get(name,Element),
-  Type_name = maps:get(type,Element),
+  #{ name := Element_name, type := Type_name } = Element,
   Type_def = maps:get({typedef,Type_name},Schema),
+  Attributes = generate_attributes(Type_def,Schema),
+  Content = generate_from_typedef(
+    Type_def,
+    into_insertions(Element_name,Schema) ),
   #element{
     name = Element_name,
-    attributes = generate_attributes(Type_def,Schema),
-    content = generate_from_typedef(Type_def,Schema) }.
+    attributes = Attributes,
+    content = Content }.
 
-%%%
-%%%   Extract the raw document text without the markup decoration.
-%%%
-raw_text(In) ->
-  white_space( to_binary(raw_each(In)) ).
+
+into_insertions(Name,Schema) ->
+  try erlang:binary_to_existing_atom(Name) of Atom when is_atom(Atom) ->
+    case Schema of
+      #{ {?MODULE,insertions} := #{ Atom := Into } } ->
+        Schema#{ {?MODULE,insertions} := Into };
+      #{ } -> Schema end
+  catch error:badarg ->
+    Schema end.
 
 white_space(In) ->
   case In of
@@ -143,16 +205,6 @@ white_space(In) ->
          Sp =:= $\t -> white_space(Tail);
     _ -> In end.
 
-
-raw_each(#element{ content = Content }) -> raw_each(Content);
-raw_each(Text) when is_binary(Text) -> [Text];
-raw_each(Content) when is_list(Content) ->
-  lists:reverse(raw_each(Content,[]));
-raw_each(_) -> [].
-
-raw_each([],Out) -> Out;
-raw_each([Each|Rest],Out) ->
-  raw_each(Rest,lists:reverse(raw_each(Each),Out)).
 
 %%%
 %%%   Remove namespace prefixes from element names.
@@ -186,10 +238,10 @@ trim_name(Name) when is_binary(Name) ->
 %%%   trim_namespace/1, convert the XSD docuemnt into a map of
 %%%   names and types that represent the document schema.
 %%%
-from_document([]) -> [];
-from_document([ #element{ name = <<"schema">> } = Schema |_]) ->
-  to_typedef_map(Schema#element.content,#{});
-from_document([_|Rest]) -> from_document(Rest).
+from_document([],_) -> [];
+from_document([ #element{ name = <<"schema">> } = Schema |_],Options) ->
+  to_typedef_map(Schema#element.content,Options);
+from_document([_|Rest],Options) -> from_document(Rest,Options).
 
 to_typedef_map([],Out) -> Out;
 to_typedef_map([#element{} = In|Rest],Out) ->

@@ -2,6 +2,7 @@
 
 -export(
   [ test_multi_values/0
+  , test_multi_values/1
   , test_extraction/0
   , test_insertion/0
   , test_insertion/1
@@ -60,16 +61,49 @@ test_multi_values() ->
                  'infoService' =>
                  #{ {xpath,'infoSvcs'} => #{ pick => [2,5] },
                     'infoSvcs' => [] } } } } } } },
+  test_multi_values(Soap_xml,Extract,[]).
+
+test_multi_values(pacs_008) ->
+  {ok,Binary} = file:read_file("protocol_tools/priv/pacs008.xml"),
+  Extract = extraction_maps(pacs_008),
+  Path =
+  [ { currency,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'IntrBkSttlmAmt',
+        #element.attributes,
+        <<"Ccy">> ] },
+    { amount,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'IntrBkSttlmAmt',
+        #element.content ] },
+    { town_name,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'Dbtr',
+        'PstlAdr',
+        'TwnNm',
+        #element.content] } ],
+  test_multi_values(Binary,Extract,Path).
 
 
+
+test_multi_values(Binary,Extract,Path) ->
   {Values,Decode} = follow_nested_map(
-    codec_xml:decode_hook(Soap_xml),
+    codec_xml:decode_hook(Binary),
     Extract,
     []),
   Compact = no_space(Decode),
   Write = codec_xml:encode(Compact),
   ok = file:write_file("tmp.xml",Write),
-  {Values,Compact}.
+  Pick = [ {N,value_of(P,Values)} || {N,P} <- Path ],
+  {Pick,Values,Compact}.
+
+
 
 
 test_extraction() ->
@@ -123,7 +157,16 @@ test_insert_loop(In,Switch) ->
 %%%
 %%%   Digging into a nested map of key-value pairs:
 %%%
-value_of(Path,Map) -> lists:foldl( fun maps:get/2, Map, Path ).
+value_of(Path,Map) when is_list(Path), is_map(Map) ->
+  lists:foldl( fun value_of/2, Map, Path );
+value_of(Index,#element{} = Element) when is_integer(Index) ->
+  erlang:element(Index,Element);
+value_of(Key,Map) when is_map_key(Key,Map) ->
+  maps:get(Key,Map);
+value_of(Key,[Head|Tail]) ->
+  [value_of(Key,Head)|value_of(Key,Tail)];
+value_of(_,[]) -> [].
+
 
 follow_nested_map(Decoded,Extracted,[]) when is_list(Decoded) ->
   {Extracted,Decoded};
@@ -284,6 +327,9 @@ extraction_maps(Type) ->
            #{'GrpHdr' => GrpHdr,
              'CdtTrfTxInf' =>
              #{'PmtId' => PmtId,
+               {xpath,'IntrBkSttlmAmt'} =>
+                 #{ attr => #{ <<"Ccy">> => [] },
+                    text => [] },
                'IntrBkSttlmAmt' => [],
                'ChrgBr' => [],
                'Dbtr' =>

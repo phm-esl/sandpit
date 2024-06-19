@@ -100,7 +100,8 @@ encode_cps(Done,Trail,#element{} = Element) ->
           {Continue,Content,lists:reverse(Here)}; % return control to calling context
         #{ } -> Continue(Content) end end;
 
-
+encode_cps(Done,_,{entity_ref,Ref}) ->
+  Done(<< $&, Ref/binary, $; >>);
 encode_cps(Done,_,{prolog,Prolog}) ->
   Done(<< "<?xml", Prolog/binary, "?>" >>);
 encode_cps(Done,_,{'CDATA',Cdata}) ->

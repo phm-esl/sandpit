@@ -145,3 +145,166 @@ Inserting an attribute value:
 //IntrBkSttlmAmt[replace(@Ccy,".*","new value")]
 ```
 
+
+
+
+
+
+
+
+# Notations proposal
+
+
+Sample PACS-008 message:
+
+```
+$> tidy -xml -indent protocol_tools/priv/pacs008.xml 
+No warnings or errors were found.
+
+<?xml version="1.0"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>pacs8bizmsgid6458556</MsgId>
+      <CreDtTm>2024-04-30T11:29:49Z</CreDtTm>
+      <NbOfTxs>1</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>INDA</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+    <CdtTrfTxInf>
+      <PmtId>
+        <EndToEndId>9483133298870858</EndToEndId>
+      </PmtId>
+      <IntrBkSttlmAmt Ccy="AOA">
+      1371584331305.19769</IntrBkSttlmAmt>
+      <ChrgBr>CRED</ChrgBr>
+      <Dbtr>
+        <Nm>Z&lt;OSCIg1n[{IhfLGB/.bTC9%]Khl(D</Nm>
+        <PstlAdr>
+          <AdrTp>
+            <Cd>ADDR</Cd>
+          </AdrTp>
+          <StrtNm>
+          #8q#&gt;G{zC0r3hJ:MLRD/1zF'?2?!K&amp;)bm0(L"$D,62M'BqRGD}:{NmY[UqX</StrtNm>
+          <BldgNb>572</BldgNb>
+          <PstCd>bVFV</PstCd>
+          <TwnNm>pmK8bz@MXW{k1'd./!5ic&gt;U5w/1</TwnNm>
+          <DstrctNm>HB&lt;Ha</DstrctNm>
+        </PstlAdr>
+        <CtryOfRes>GA</CtryOfRes>
+      </Dbtr>
+      <DbtrAgt>
+        <FinInstnId>
+          <BICFI>JRBANK12345</BICFI>
+        </FinInstnId>
+      </DbtrAgt>
+      <CdtrAgt>
+        <FinInstnId>
+          <BICFI>RJBANK98765</BICFI>
+        </FinInstnId>
+      </CdtrAgt>
+      <Cdtr>
+        <Nm>Y</Nm>
+        <PstlAdr>
+          <AdrTp>
+            <Cd>ADDR</Cd>
+          </AdrTp>
+          <StrtNm>&lt;Ie)$</StrtNm>
+          <BldgNb>93</BldgNb>
+          <PstCd>85d5n4S6jl9</PstCd>
+          <TwnNm>t</TwnNm>
+          <DstrctNm>-E&gt;;*ABDG4u9]&gt;A</DstrctNm>
+        </PstlAdr>
+        <CtryOfRes>LY</CtryOfRes>
+      </Cdtr>
+    </CdtTrfTxInf>
+  </FIToFICstmrCdtTrf>
+</Document>
+```
+
+Demonstration of extracting values into a property list:
+
+```
+1> flow_pacs_test:test_multi_values(pacs_008).
+{[{currency,[<<"AOA">>]},
+  {amount,[[<<"1371584331305.19769">>]]},
+  {town_name,[[<<"pmK8bz@MXW{k1'd./!5ic">>,
+               {entity_ref,<<"gt">>},
+               <<"U5w/1">>]]}],
+ #{'Document' =>
+       #{'FIToFICstmrCdtTrf' =>
+             #{'CdtTrfTxInf' =>
+                   #{'IntrBkSttlmAmt' =>
+                         [{element,<<"IntrBkSttlmAmt">>,
+                                   #{<<"Ccy">> => <<"AOA">>},
+                                   [<<"1371584331305.19769">>]}],
+                     'Dbtr' =>
+                         #{'PstlAdr' =>
+                               #{'TwnNm' =>
+                                     [{element,<<"TwnNm">>,#{},
+                                               [<<"pmK8bz@MXW{k1'd./!5ic">>,
+                                                {entity_ref,<<"gt">>},
+                                                <<"U5w/1">>]}],...}}}}}
+ [{prolog,<<" version=\"1.0\"">>},
+  {element,<<"Document">>,
+           #{<<"xmlns">> =>
+                 <<"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">>},
+           [{element,<<"FIToFICstmrCdtTrf">>,#{},
+                     [{element,<<"GrpHdr">>,#{},
+                               [{element,<<"MsgId">>,#{},[<<"pacs8bizmsgid645"...>>]},
+                                {element,<<"CreDtTm">>,#{},[<<"2024-04-30T1"...>>]},
+                                {element,<<"NbOfTxs">>,#{},[<<"1">>]},
+                                {element,<<"SttlmInf">>,#{},[{element,...}]}]},
+                      {element,<<"CdtTrfTxInf">>,#{},
+                               [{element,<<"PmtId">>,#{},[{element,<<"EndT"...>>,#{},...}]},
+                                {element,<<"IntrBkSttlmAmt">>,
+                                         #{<<"Ccy">> => <<"AOA">>},
+                                         [<<"13715843"...>>]},
+                                {element,<<"ChrgBr">>,#{},[<<"CRED">>]},
+                                {element,<<"Dbtr">>,#{},[{...}|...]},
+                                {element,<<"DbtrAgt">>,#{},[...]},
+                                {element,<<"Cdtr"...>>,#{},...},
+                                {element,<<...>>,...}]}]}]}]}
+```
+
+The property list is collected using the following named locations in the
+decoded XML document:
+
+```
+test_multi_values(pacs_008) ->
+  {ok,Binary} = file:read_file("protocol_tools/priv/pacs008.xml"),
+  Extract = extraction_maps(pacs_008),
+  Path =
+  [ { currency,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'IntrBkSttlmAmt',
+        #element.attributes,
+        <<"Ccy">> ] },
+    { amount,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'IntrBkSttlmAmt',
+        #element.content ] },
+    { town_name,
+      [ 'Document',
+        'FIToFICstmrCdtTrf',
+        'CdtTrfTxInf',
+        'Dbtr',
+        'PstlAdr',
+        'TwnNm',
+        #element.content] } ],
+  test_multi_values(Binary,Extract,Path).
+```
+
+The `Path` broadly corresponds to XPath notations:
+
+```
+/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt[@Ccy]
+/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt[text()]
+/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/Dbtr/PstlAdr/TwnNm[text()]
+```
+

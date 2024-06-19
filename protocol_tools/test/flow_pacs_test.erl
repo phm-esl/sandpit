@@ -327,9 +327,6 @@ extraction_maps(Type) ->
            #{'GrpHdr' => GrpHdr,
              'CdtTrfTxInf' =>
              #{'PmtId' => PmtId,
-               {xpath,'IntrBkSttlmAmt'} =>
-                 #{ attr => #{ <<"Ccy">> => [] },
-                    text => [] },
                'IntrBkSttlmAmt' => [],
                'ChrgBr' => [],
                'Dbtr' =>

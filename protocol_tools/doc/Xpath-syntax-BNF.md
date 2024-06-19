@@ -1,3 +1,82 @@
+# XPath syntax
+
+[Original document](https://www.w3schools.com/xml/xpath_syntax.asp)
+
+```
+<?xml version="1.0" encoding="UTF-8"?>
+<bookstore>
+<book>
+  <title lang="en">Harry Potter</title>
+  <price>29.99</price>
+</book>
+<book>
+  <title lang="en">Learning XML</title>
+  <price>39.95</price>
+</book>
+</bookstore>
+```
+
+
+## Selecting Nodes
+
+| Expression | Description |
+| ---------- | ----------- |
+| `nodename` | Selects all nodes with the name "nodename" |
+| `/`        | Selects from the root node |
+| `//`       | Selects nodes in the document from the current node that match the selection no matter where they are |
+| `.`        | Selects the current node |
+| `..`       | Selects the parent of the current node |
+| `@`        | Selects attributes |
+
+
+## Expression examples
+
+| Path Expression   | Result                                                              |
+| ----------------- | ------------------------------------------------------------------- |
+| `bookstore`       | all nodes with the name "bookstore"                                 |
+| `/bookstore`      | the root element bookstore. Absolute path from root starts with `/` |
+| `bookstore/book`  | all book elements that are children of bookstore                    |
+| `//book`          | all book elements anywhere in the document                          |
+| `bookstore//book` | all `book` elements inside `bookstore` element at any level         |
+| `//@lang`         | all attributes that are named lang                                  |
+
+## Predicates
+
+Predicates are always embedded in square brackets.
+
+| Path Expression                    | Result |
+| ---------------------------------- | ------ |
+| /bookstore/book[1]                 | first book element child of the bookstore element |
+| /bookstore/book[last()]            | last book element child of the bookstore element |
+| /bookstore/book[last()-1]          | last but one book element child of the bookstore element |
+| /bookstore/book[position()<3]      | first two book elements children of the bookstore element |
+| //title[@lang]                     | all title elements with attribute named lang |
+| //title[@lang='en']                | all title elements with "lang" attribute value of "en" |
+| /bookstore/book[price>35.00]       | all book elements children of bookstore element with price element of value greater than 35.00 |
+| /bookstore/book[price>35.00]/title | all title elements children of book elements children of bookstore element with price element of value greater than 35.00 |
+
+
+## Wildcards
+
+| Wildcard | Description |
+| -------- | ----------- |
+| `*`      | any element node |
+| `@*`     | any attribute node |
+| `node()` | any node of any kind |
+
+## Wildcard examples
+
+| Path Expression | Result |
+| --------------- | ----------- |
+| `/bookstore/*`  | all the child element nodes of the bookstore element |
+| `//*`           | all elements in the document |
+| `//title[@*]`   | all title elements which have at least one attribute of any kind |
+
+
+
+
+
+
 # Examples
 
 | You want to pick an element:      | Syntax                                | Example                                |

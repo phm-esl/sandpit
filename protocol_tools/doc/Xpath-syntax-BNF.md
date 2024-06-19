@@ -82,7 +82,7 @@ Predicates are always embedded in square brackets.
 | You want to pick an element:      | Syntax                                | Example                                |
 | --------------------------------- | ------------------------------------- | -------------------------------------- |
 | is anywhere in the DOM with tag   | `//tagName`                           | `//span`                               |
-| has attribute name & value        | `//tagName[@id="idValue"]`            | `//div[@id="main-product"`             |
+| has attribute name & value        | `//tagName[@id="idValue"]`            | `//div[@id="main-product"]`            |
 | is child of element with tag      | `//parent/child`                      | `//div/span`                           |
 | is first child of element         | `//parent/child[1]`                   | `//div[@class="quote"]/span[1]`        |
 | is parent of element              | `//child/..`                          | `//span[@class="text"/..`              |
@@ -101,7 +101,7 @@ Predicates are always embedded in square brackets.
 ## Types Of XPath Node
 
 * Element Nodes: nodes directly under the root node. May contain attributes. Is an XML tag.
-* Attribute Nodes: attribute of the element node. Element node is the parent. The shortcut forattribute nodes is `@`.
+* Attribute Nodes: attribute of the element node. Element node is the parent. The shortcut for attribute nodes is `@`.
 * Text Nodes: All the text inside the element node
 * Comment Nodes: in between `<!--` ... `-->`
 * Namespaces: used to remove ambiguity between more than one set of the XML element names.

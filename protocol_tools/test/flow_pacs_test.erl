@@ -127,7 +127,8 @@ test_extraction() ->
       'CdtTrfTxInf',
       'Dbtr',
       'PstlAdr',
-      'TwnNm'],
+      'TwnNm',
+      #element.content],
   TwnNm = value_of(Path,Values),
   {{Path,TwnNm},Out}.
 
@@ -503,15 +504,15 @@ test_generator_speed(Name) ->
   Test = fun Loop (N) ->
     receive stop -> Self ! {stopped,N}
     after 0 ->
-%      codec_xml:decode(
+      codec_xml:decode(
         codec_xml:encode(
           [ {prolog,<<" version=\"1.0\" encoding=\"UTF-8\" ">>},
             #element{
               name = Root_name,
               attributes = #{ <<"xmlns">> => Namespace },
               content = schema_xsd:generate_from_schema(Root_type,Schema)
-              } ] ),
-%               ),
+              } ] )
+               ),
       Loop( N + 1 ) end end,
   Pid = erlang:spawn(fun () -> Test(0) end),
   receive after 10000 ->

@@ -44,70 +44,126 @@
     attributes = #{},
     content = [] }).
 
-%-define(log(F,A),logger:notice("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
--define(log(F,A),io:format("~p:~p~n\t"++F,[?FUNCTION_NAME,?LINE|A])).
+%-define(log(F,A),logger:notice("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
 
 
 
-encode(In) -> encode(In,#{}).
+encode(In) ->
+  Done = fun (Out) -> to_binary(Out) end,
+  encode_only(Done,In).
 
 encode(In,Map) ->
   Done = fun (Out) -> to_binary(Out) end,
   Trail = {Map,[]},
-  encode_cps(Done,Trail,In).
+  encode_inject(Done,Trail,In).
 
-encode_list_cps(Done,Trail,In) ->
-  encode_list_cps(Done,Trail,In,[]).
 
-encode_list_cps(Done,_,[],Out) ->
-  Done(lists:reverse(Out));
-encode_list_cps(Done,Trail,[Each|Rest],Out) ->
-  Back = fun (Fill) -> encode_list_cps(Done,Trail,Rest,[Fill|Out]) end,
-  encode_cps(Back,Trail,Each).
+encode_inject(Done,Trail,#element{} = Element) ->
 
-encode_cps(Done,_,Fill) when is_binary(Fill) ->
-  Done(Fill);
-encode_cps(Done,Trail,Content) when is_list(Content) ->
-  encode_list_cps(Done,Trail,Content);
-encode_cps(Done,Trail,#element{} = Element) ->
-  Attr = encode_attributes(Element),
+  Update = fun ({Inject,Attr}) ->
+    % Here the caller gave content to Inject, and Attr to change too
+    Next = fun (Encoded) ->
+      Merged = maps:merge(Element#element.attributes,Attr),
+      Wrap = encode_element(
+        Element#element{ attributes = Merged, content = Encoded }),
+      Done(Wrap) end,
+    encode_inject(Next,Trail,Inject) end,
+
   #element{ name = Name, content = Content } = Element,
-
-  Empty = fun () ->
-    Done(<< ?less_than, Name/binary, Attr/binary, ?empty_element >>) end,
-
-  Continue = fun (In) ->
-    case In of
-      empty -> Empty();
-      [] -> Empty();
-      _ ->
-        Next = fun (Enc) ->
-          Fill = to_binary(Enc),
-          Done(<< ?less_than, Name/binary, Attr/binary, ?greater_than,
-                  Fill/binary,
-                  ?end_tag, Name/binary, ?greater_than >>) end,
-        encode_cps(Next,Trail,In) end end,
-
   case to_atom(trim(Name)) of
-    [] -> Continue(Content);
+    [] ->
+      % no modifications to this Element nor its contents
+      encode_only(Done,Element);
     [Atom] ->
-      {Map,Where} = Trail,
+      {Action,Where} = Trail,
       Here = [Atom|Where],
-      case Map of
+      case Action of
         #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
-          encode_cps(Continue,{Into,Here},Content);
+          % Enter into the Content that can eventually be modified
+          Next = fun (Encoded) ->
+            Wrap = encode_element( Element#element{ content = Encoded } ),
+            Done(Wrap) end,
+          encode_inject(Next,{Into,Here},Content);
         #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
-          {Continue,Content,[{Atom,Inject,Attr}|Where]};
+          % return control to caller to decide how to treat this element
+          % the Action says to also deal with Attr changes too
+          {Update,Content,[{Atom,Inject,Attr}|Where]};
         #{ Atom := Inject } ->
-          {Continue,Content,[{Atom,Inject,#{}}|Where]}; % return control to calling context
-        #{ } -> Continue(Content) end end;
+          % return control to caller to decide how to treat this element
+          Attr = #{},
+          {Update,Content,[{Atom,Inject,Attr}|Where]};
+        #{ } ->
+          % The Name is not located here in the Action, no modifications.
+          encode_only(Done,Element) end end;
+encode_inject(Done,Trail,Content) when is_list(Content) ->
+  encode_list_inject(Done,Trail,Content);
+encode_inject(Done,_,Last) ->
+  encode_last(Done,Last).
 
-encode_cps(Done,_,{entity_ref,Ref}) ->
+encode_list_inject(Done,Trail,In) ->
+  encode_list_inject(Done,Trail,In,[]).
+
+encode_list_inject(Done,_,[],Out) ->
+  Done(lists:reverse(Out));
+encode_list_inject(Done,Trail,[Each|Rest],Out) ->
+  Back = fun (Fill) -> encode_list_inject(Done,Trail,Rest,[Fill|Out]) end,
+  encode_inject(Back,Trail,Each).
+
+
+
+
+encode_only(Done,#element{} = Element) ->
+  % first encode the Content, Next wrap the Encoded result with the tags
+  % and attributes.
+  Next = fun (Encoded) ->
+    Wrap = encode_element( Element#element{ content = Encoded } ),
+    Done(Wrap) end,
+  encode_only(Next,Element#element.content);
+encode_only(Done,Content) when is_list(Content) ->
+  encode_list_only(Done,Content);
+encode_only(Done,Last) ->
+  encode_last(Done,Last).
+
+encode_list_only(Done,In) -> encode_list_only(Done,In,[]).
+
+encode_list_only(Done,[],Out) ->
+  Done(lists:reverse(Out));
+encode_list_only(Done,[Each|Rest],Out) ->
+  Back = fun (Fill) -> encode_list_only(Done,Rest,[Fill|Out]) end,
+  encode_only(Back,Each).
+
+
+encode_last(Done,Fill) when is_binary(Fill) ->
+  Done(Fill);
+encode_last(Done,{entity_ref,Ref}) ->
   Done(<< $&, Ref/binary, $; >>);
-encode_cps(Done,_,{prolog,Prolog}) ->
+encode_last(Done,{prolog,Prolog}) ->
   Done(<< "<?xml", Prolog/binary, "?>" >>);
-encode_cps(Done,_,{'CDATA',Cdata}) ->
+encode_last(Done,{'CDATA',Cdata}) ->
   Done(<< "<![CDATA[", Cdata/binary, "]]>" >>).
+
+
+encode_element(#element{ } = In) ->
+  %
+  % Value of Content must be an io_list, no tuples, no maps etc.
+  %
+  % This requires that encode_element/1 is ONLY called from within the
+  % function closure that is passed as first parameter to either
+  % encode_inject/3 or encode_only/2, such that it is called only when the
+  % closing tag of an XML element is encountered, and thus the Contents of
+  % the In element are encoded for certain.
+  %
+  #element{ name = Name, attributes = Attributes, content =  Content } = In,
+  Attr = encode_attributes(Attributes),
+  case Content of
+    Empty when Empty =:= empty; Empty =:= [] ->
+      << ?less_than, Name/binary, Attr/binary, ?empty_element >>;
+    _ ->
+      Fill = to_binary(Content),
+      << ?less_than, Name/binary, Attr/binary, ?greater_than,
+         Fill/binary,
+         ?end_tag, Name/binary, ?greater_than >> end.
 
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
@@ -122,8 +178,7 @@ to_atom(Bin) when is_binary(Bin) ->
 
 
 
-encode_attributes(Element) ->
-  Attr = Element#element.attributes,
+encode_attributes(Attr) when is_map(Attr) ->
   to_binary(maps:fold(fun encode_each_attr/3,[],Attr)).
 
 encode_each_attr(Name,Value,Out) ->

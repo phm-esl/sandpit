@@ -34,7 +34,7 @@ test_dir() ->
 
 xml_from_xsd(In) ->
   Out = codec_xml:encode(
-    schema_xsd:generate_from_XSD_file(In,[minimal]) ),
+    schema_xsd:generate_from_XSD_file(In)),
   File_name = In ++ "-output.XML",
   ?log("File_name = ~p.~n",[File_name]),
   ok = file:write_file(File_name,Out).
@@ -147,19 +147,22 @@ test_insertion(Options) ->
   Extract_008 = extraction_maps(pacs_008),
   PACS_008 = test_insert_loop(
     codec_xml:encode(Decoded,Extract_008),
-    fun (Old,_) -> Old end),
+    fun (Old,_) -> Old end), % keep original Old values
   Populated = populate_insert_map(Extract_008),
   Modified = test_insert_loop(
     codec_xml:encode(Decoded,Populated),
-    fun (_,New) -> New end),
+    fun (_,New) -> New end), % insert modified New values
   file:write_file("modified.xml",Modified). % write document to file for debugging
 
 test_insert_loop(In,Switch) ->
   case In of
 
     {Fn,Original,Insertion} when is_function(Fn) ->
-      {_,Inject,_Attr} = hd(Insertion),
-      test_insert_loop(Fn(Switch(Original,Inject)),Switch); % Not modifying the Value
+      {_,Inject,Attr} = hd(Insertion),
+      Update = {Switch(Original,Inject),Attr},
+      test_insert_loop(
+        Fn( Update ),
+        Switch );
 
     Out -> Out end.
 

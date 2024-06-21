@@ -22,20 +22,30 @@ to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
 to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
 
-valid_options(In) -> valid_options(In,#{}).
+valid_options(In) ->
+  Defaults = #{ {?MODULE,maxOccurs} => 3 }, % Restrain length of sequences etc.
+  valid_options(In,Defaults).
 
 valid_options([],Out) -> Out;
-valid_options([{insertions,Insert}|Options],Out) when is_map(Insert) ->
+valid_options([Head|Tail],Out) ->
+  valid_options(Tail,valid_options(Head,Out));
+
+valid_options({maxOccurs,Max},Out) when is_integer(Max), 0 =< Max ->
+  %
+  % Restrain (or not!) the maximum repetition of elements in sequences
+  %
+  Out#{ {?MODULE,maxOccurs} => Max };
+valid_options({insertions,Insert},Out) when is_map(Insert) ->
   %
   % Preserve optional elements if the Insert map contains values for these.
   %
-  valid_options(Options,Out#{ {?MODULE,insertions} => Insert });
-valid_options([minimal|Options],Out) ->
+  Out#{ {?MODULE,insertions} => Insert };
+valid_options(minimal,Out) ->
   %
   % Omit all elements with minOccurs="0", but see 'insertions' above for
   % exceptions to this.
   %
-  valid_options(Options,Out#{ {?MODULE,minimal} => true }).
+  Out#{ {?MODULE,minimal} => true }.
 
 %%%
 %%%   The result is the Erlang term representing an XML
@@ -153,15 +163,16 @@ repetitions(Name,Min,Max,Schema) ->
   case Schema of
 %%    #{ {?MODULE,insertions} := #{ {xpath,Name} := Xpath } } ->
 %%      % TODO If value Xpath is an index, set Min to value of index
-    #{ {?MODULE,insertions} := #{ Name := _ }, {?MODULE,minimal} := true } ->
-      1;
     #{ {?MODULE,insertions} := #{ Name := _ } } ->
-      make_value:random_integer(1,Max);
+      repetitions(1,Max,Schema);
     #{ } -> repetitions(Min,Max,Schema) end.
 
 repetitions(Min,Max,Schema) ->
   case Schema of
     #{ {?MODULE,minimal} := true } -> Min;
+    #{ {?MODULE,maxOccurs} := Limit } when Limit < Min -> 0;
+    #{ {?MODULE,maxOccurs} := Limit } when Min =< Limit ->
+      make_value:random_integer(Min,Limit);
     #{ } -> make_value:random_integer(Min,Max) end.
 
 to_atom(Bin) when is_binary(Bin) ->

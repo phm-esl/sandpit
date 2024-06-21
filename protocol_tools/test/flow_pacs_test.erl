@@ -137,6 +137,12 @@ test_extraction() ->
 
 
 test_insertion() ->
+  %
+  % Generate a 'minimal' XML document from the XSD, with the requirement
+  % that all locations in the result must include those specified in the
+  % 'insertions' map, even if these elements could be omitted due to
+  % minOccurs="0" in the XSD.
+  %
   Extract_008 = extraction_maps(pacs_008),
   test_insertion([{insertions,Extract_008},minimal]).
 
@@ -145,10 +151,22 @@ test_insertion(Options) ->
   file:write_file("original.xml",PACS_008), % write document to file for debugging
   Decoded = codec_xml:decode(PACS_008),
   Extract_008 = extraction_maps(pacs_008),
+  %
+  % Check that a call-back that makes no change will produce a result
+  % identical to the original PACS_008 document.
+  %
   PACS_008 = test_insert_loop(
     codec_xml:encode(Decoded,Extract_008),
     fun (Old,_) -> Old end), % keep original Old values
+  %
+  % Make a Populated map from the Extract_008 map containing modified values
+  % and attributes to be inserted into the document.
+  %
   Populated = populate_insert_map(Extract_008),
+  %
+  % Insert the Populated map values into the Modified result using the
+  % provided call-back function.
+  %
   Modified = test_insert_loop(
     codec_xml:encode(Decoded,Populated),
     fun (_,New) -> New end), % insert modified New values

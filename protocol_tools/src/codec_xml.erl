@@ -96,8 +96,10 @@ encode_cps(Done,Trail,#element{} = Element) ->
       case Map of
         #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
           encode_cps(Continue,{Into,Here},Content);
-        #{ Atom := _ } ->
-          {Continue,Content,lists:reverse(Here)}; % return control to calling context
+        #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
+          {Continue,Content,[{Atom,Inject,Attr}|Where]};
+        #{ Atom := Inject } ->
+          {Continue,Content,[{Atom,Inject,#{}}|Where]}; % return control to calling context
         #{ } -> Continue(Content) end end;
 
 encode_cps(Done,_,{entity_ref,Ref}) ->

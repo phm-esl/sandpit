@@ -48,6 +48,9 @@ pick_xsd(In) ->
 
 
 test_multi_values() ->
+  %
+  % Demo of an Extract map containing XPath flavour predicates
+  %
   {ok,Soap_xml} = file:read_file("protocol_tools/priv/OneNDS_addRequest.xml"),
   Extract =
     #{ 'Envelope' =>
@@ -64,6 +67,10 @@ test_multi_values() ->
   test_multi_values(Soap_xml,Extract,[]).
 
 test_multi_values(pacs_008) ->
+  %
+  % Demo of an Extract map only containing locations, then the XPath
+  % predicates applied to the result.
+  %
   {ok,Binary} = file:read_file("protocol_tools/priv/pacs008.xml"),
   Extract = extraction_maps(pacs_008),
   Path =
@@ -72,14 +79,14 @@ test_multi_values(pacs_008) ->
         'FIToFICstmrCdtTrf',
         'CdtTrfTxInf',
         'IntrBkSttlmAmt',
-        #element.attributes,
+        #element.attributes, % similar to //IntrBkSttlmAmt[@Ccy] in XPath
         <<"Ccy">> ] },
     { amount,
       [ 'Document',
         'FIToFICstmrCdtTrf',
         'CdtTrfTxInf',
         'IntrBkSttlmAmt',
-        #element.content ] },
+        #element.content ] }, % similar to //IntrBkSttlmAmt[text()] in XPath
     { town_name,
       [ 'Document',
         'FIToFICstmrCdtTrf',
@@ -89,8 +96,6 @@ test_multi_values(pacs_008) ->
         'TwnNm',
         #element.content] } ],
   test_multi_values(Binary,Extract,Path).
-
-
 
 test_multi_values(Binary,Extract,Path) ->
   {Values,Decode} = follow_nested_map(
@@ -126,31 +131,63 @@ test_extraction() ->
   TwnNm = value_of(Path,Values),
   {{Path,TwnNm},Out}.
 
+
+
+
+
+
 test_insertion() ->
   Extract_008 = extraction_maps(pacs_008),
   test_insertion([{insertions,Extract_008},minimal]).
 
 test_insertion(Options) ->
-  ?log("Options = ~p.~n",[Options]),
   PACS_008 = generate_pacs_008(Options),
   file:write_file("original.xml",PACS_008), % write document to file for debugging
-
   Decoded = codec_xml:decode(PACS_008),
   Extract_008 = extraction_maps(pacs_008),
   PACS_008 = test_insert_loop(
     codec_xml:encode(Decoded,Extract_008),
-    fun (I) -> I end),
+    fun (Old,_) -> Old end),
+  Populated = populate_insert_map(Extract_008),
   Modified = test_insert_loop(
-    codec_xml:encode(Decoded,Extract_008),
-    fun (_) -> <<"******* CHANGED VALUE *******">> end),
+    codec_xml:encode(Decoded,Populated),
+    fun (_,New) -> New end),
   file:write_file("modified.xml",Modified). % write document to file for debugging
 
 test_insert_loop(In,Switch) ->
   case In of
-    {Fn,Value,Atom} when is_function(Fn) ->
-      ?log("Atom = ~p.~n\tValue = ~p.~n",[Atom,Value]),
-      test_insert_loop(Fn(Switch(Value)),Switch); % Not modifying the Value
+
+    {Fn,Original,Insertion} when is_function(Fn) ->
+      {_,Inject,_Attr} = hd(Insertion),
+      test_insert_loop(Fn(Switch(Original,Inject)),Switch); % Not modifying the Value
+
     Out -> Out end.
+
+populate_insert_map(Map) ->
+  maps:fold(fun populate_insert_map/3, #{}, Map).
+
+populate_insert_map(Key,Map,Out) when is_map(Map) ->
+  Out#{ Key => populate_insert_map(Map) };
+populate_insert_map('IntrBkSttlmAmt' = Key,[],Out) ->
+  %
+  % In addition to changing the text of the content, also change the value
+  % of the attribute Ccy in element IntrBkSttlmAmt.
+  %
+  Bin = atom_to_binary(Key),
+  Value = << "**** Changed ", Bin/binary, " value ****" >>,
+  Attr = #{ <<"Ccy">> => <<"**** Changed Ccy value ****">> },
+  Out#{
+    {xpath,Key} => #{ attr => Attr },
+    Key => Value };
+populate_insert_map(Key,[],Out) ->
+  Bin = atom_to_binary(Key),
+  Out#{ Key => << "**** Changed ", Bin/binary, " value ****" >> };
+populate_insert_map(Key,Val,Out) ->
+  Out#{ Key => Val }.
+
+
+
+
 
 
 

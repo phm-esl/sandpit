@@ -44,6 +44,9 @@ $> tidy -xml -indent tmp.xml 2>/dev/null
 </Document>
 ```
 
+This result is missing elements that the XSD specifies must occur at least
+once. The generated message is likely not valid due to missing mandatory
+elements.
 
 
 ## The `'minimal'` option
@@ -233,4 +236,71 @@ $> tidy -xml -indent tmp.xml 2>/dev/null
 </Document>
 ```
 
+## The `'maxOccurs'` option
+
+The value of the `{maxOccurs,N}` option will permit sequences of elements to
+contain a range of zero or one up to N instances. The default value for this
+option if it is not specified is 3. The limit can be reduced, or increased
+at risk of the result turning out huge.
+
+An example generation with the default `{maxOccurs,3}` i.e. no options
+selected:
+
+```
+file:write_file(
+  "tmp.xml",
+  codec_xml:encode(
+    schema_xsd:generate_from_XSD_file(
+      "protocol_tools/priv/pacs.008.001.11.xsd",
+      []))).
+```
+
+The size of the tmp.xml file is quite large at 645kb:
+
+```
+$> ls -l tmp.xml
+-rw-r--r-- 1 phm 660382 Jun 25 15:15 tmp.xml
+
+$> tidy -xml -indent tmp.xml 2>/dev/null | wc -l
+21415
+
+$> tidy -xml -indent tmp.xml 2>/dev/null | head -30
+<?xml version="1.0" encoding="utf-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>0 n IX04Bkgn0W8 8O Y5E4 i e0d</MsgId>
+      <CreDtTm>2024-06-25T14:15:27</CreDtTm>
+      <BtchBookg>FALSE</BtchBookg>
+      <BtchBookg>FALSE</BtchBookg>
+      <BtchBookg>TRUE</BtchBookg>
+      <NbOfTxs>207108806433145</NbOfTxs>
+      <CtrlSum>5.00791284825101862</CtrlSum>
+      <CtrlSum>6.</CtrlSum>
+      <CtrlSum>65.007886731195</CtrlSum>
+      <IntrBkSttlmDt>2024-06-25</IntrBkSttlmDt>
+      <SttlmInf>
+        <SttlmMtd>INDA</SttlmMtd>
+        <ClrSys>
+          <Prtry>nyyGYVvRP4 ews2m2T1v</Prtry>
+        </ClrSys>
+        <ClrSys>
+          <Cd>25</Cd>
+        </ClrSys>
+        <ClrSys>
+          <Prtry>R592cPw</Prtry>
+        </ClrSys>
+        <InstgRmbrsmntAgt>
+          <FinInstnId>
+            <ClrSysMmbId>
+              <MmbId>5GZ Hq4O r38B2</MmbId>
+            </ClrSysMmbId>
+```
+
+The result contains elements that repeat up to three times, and can have
+contents that mutually contradict too. In the example above, the `BtchBookg`
+element appear three times, and so does the `CtrlSum` too, among others.
+
+This style of generated test message can be useful to weed out crashes and
+unexpected behaviour in the test subject.
 

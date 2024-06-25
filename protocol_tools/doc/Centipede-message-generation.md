@@ -6,9 +6,52 @@ the random values so that they remain valid even if these values are
 meaningless to real systems that exchange these message types.
 
 The `schema_xsd` module offers the `generate_from_XSD_file/2` function that
-creates a decoded representation of a randomised but valid XML message. It
-accepts a range of options. One option is `minimal` that produces the most
-compact (and least useful) XML result:
+creates a decoded representation of a randomised but valid XML message.  It
+accepts a range of options.
+
+## The `'minOccurs'` option
+
+One option is `{maxOccurs,0}` that produces the
+most compact (and least useful) XML result where any sequence of elements is
+reduced to zero instances:
+
+```
+file:write_file(
+  "tmp.xml",
+  codec_xml:encode(
+    schema_xsd:generate_from_XSD_file(
+      "protocol_tools/priv/pacs.008.001.11.xsd",
+       [{maxOccurs,0}]))).
+
+```
+
+The output `"tmp.xml"` file pretty printed:
+
+```
+$> tidy -xml -indent tmp.xml 2>/dev/null
+<?xml version="1.0" encoding="utf-8"?>
+<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr>
+      <MsgId>GAup250BMO</MsgId>
+      <CreDtTm>2024-06-25T14:00:13</CreDtTm>
+      <NbOfTxs>107</NbOfTxs>
+      <SttlmInf>
+        <SttlmMtd>INGA</SttlmMtd>
+      </SttlmInf>
+    </GrpHdr>
+  </FIToFICstmrCdtTrf>
+</Document>
+```
+
+
+
+## The `'minimal'` option
+
+The `minimal` option is more relaxed than `{maxOccurs,0}`. A `minimal`
+output will ensure that all sequences of elements will contain at least
+`minOccurs` instances. If the XSD specifies `minOccurs="1"` the element will
+be present in the result.
 
 ```
 file:write_file(
@@ -59,6 +102,8 @@ inside e.g. the `<Dbtr />`, nor the `<FinInstnId />`. In practice these
 missing slots can make the result useless except in one test, to confirm
 that the absence of values does not break the test subject, nor lead to
 unexpected behaviour.
+
+## The `'insertions'` option
 
 Testing normally requires more range of possible values, and a minimal
 template has to be expanded to include more slots to accommodate all these
@@ -119,7 +164,7 @@ The result pretty-printed now includes random but valid values instead of
 empty elements:
 
 ```
-1373> tidy -xml -indent tmp.xml 2>/dev/null
+$> tidy -xml -indent tmp.xml 2>/dev/null
 <?xml version="1.0" encoding="utf-8"?>
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11">
   <FIToFICstmrCdtTrf>

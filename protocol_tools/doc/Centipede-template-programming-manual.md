@@ -39,7 +39,7 @@ either one of two things.  It is either:
 
 * Or it is `Out`,the entire encoded message binary when all the values have been provided to fill all the slots in the message form (line 09).
 
-[More detail about the `Populated_value_map` parameter below.](The_value_map)
+[More detail about the `Populated_value_map` parameter below.](the-value-map)
 
 The `Insertion` is a list of atoms that describe the “insertion path” inside
 the message form, except for the head of the list.  At the head is a tuple

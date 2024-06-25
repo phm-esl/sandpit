@@ -25,6 +25,8 @@ substituted with another, and the test definition not need any modification.
 This document describes how this abstraction of protocol encodings is
 achieved in practice.
 
+## Filling slots in the message
+
 First lets focus on the insertion of values into a message form being
 filled.  The program code that does this is a loop that iterates over the
 encoded form of the message that will pause to accept instruction from the
@@ -37,7 +39,7 @@ either one of two things.  It is either:
 
 * Or it is `Out`,the entire encoded message binary when all the values have been provided to fill all the slots in the message form (line 09).
 
-More detail about the `Populated_value_map` parameter below.
+[More detail about the `Populated_value_map` parameter below.](The_value_map)
 
 The `Insertion` is a list of atoms that describe the “insertion path” inside
 the message form, except for the head of the list.  At the head is a tuple
@@ -71,6 +73,8 @@ from calling `Fn`.
 ```
 
 > Note-1: the tuple layout returned by the Fn closure may change subject to document review
+
+## The value map
 
 The structure of the `Populated_value_map` in this example is:
 
@@ -119,6 +123,8 @@ key that connects the `'attr'` value to the XML attributes for the
 > from binary text string to an existing atom. Searching the Erlang atom
 > table acts like a filter to discard loactions of no interest, but may
 > offer no practical advantage for the cost of more complex program code.
+
+## Encoded output
 
 The resulting `Out` value looks like this pretty-printed, the actual value
 does not have whitespace nor indentation:

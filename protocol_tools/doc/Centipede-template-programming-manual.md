@@ -2,7 +2,7 @@
 
 Centipede tool to make protocol testing simple, easy and fast.
 
-This is a work-in-progress, subject to change after document reviews.
+> Note-0: This is a work-in-progress, subject to change after document reviews.
 
 ## Intro
 
@@ -17,7 +17,7 @@ allows tests to prove invalid input is treated appropriately too, bypassing
 the formal constraints of the protocol that might normally prevent such
 invalid examples.
 
-Centipede uses this concept of linear message form with slots filled with
+Centipede applies this concept of linear message form with slots filled with
 values.  This enables tests to be constructed so that the underlying
 protocol can be almost entirely abstracted, such that one protocol can be
 substituted with another, and the test definition not need any modification.
@@ -70,7 +70,7 @@ from calling `Fn`.
 11 end.
 ```
 
-> Note: the tuple layout returned by the Fn closure may change subject to document review
+> Note-1: the tuple layout returned by the Fn closure may change subject to document review
 
 The structure of the `Populated_value_map` in this example is:
 
@@ -97,6 +97,28 @@ The structure of the `Populated_value_map` in this example is:
               #{attr =>
                 #{<<"Ccy">> => <<"**** Changed Ccy value ****">>}}}}}}
 ```
+
+The map contains keys corresponding to the names of elements within the
+message form.  The tree structure of the message form is reflected in the
+map, with maps within maps.
+
+In the message template there is a slot for the `"Ccy"` attribute in the
+`'IntrBkSttlmAmt'` element.  The `Populated_value_map` describes the
+location of this slot in "meta-data", with the `{xpath,'IntrBkSttlmAmt'}`
+key that connects the `'attr'` value to the XML attributes for the
+`'IntrBkSttlmAmt'` XML element.
+
+> Note-2: the data type `{xpath,...}` that is used as a key for metadata
+> should be reviewed, and changed if the key does not fit well. Perhaps
+> `{meta,'IntrBkSttlmAmt'}` will avoid implicit XPath interpretation, and
+> allow for use in other protocols?
+
+> Note-3: the keys used to identify value slot locations are atoms. This is
+> not strictly necessary, the locations could alternatively be identified
+> with e.g. `<<"Document">>` instead of `'Document'`, and avoid a conversion
+> from binary text string to an existing atom. Searching the Erlang atom
+> table acts like a filter to discard loactions of no interest, but may
+> offer no practical advantage for the cost of more complex program code.
 
 The resulting `Out` value looks like this pretty-printed, the actual value
 does not have whitespace nor indentation:

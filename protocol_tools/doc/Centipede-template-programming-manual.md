@@ -30,26 +30,30 @@ filled.  The program code that does this is a loop that iterates over the
 encoded form of the message that will pause to accept instruction from the
 test application.  Below is a simple Erlang function to illustrate.
 
-The Encoder returned from calling the codec_xml:encode/2 function is either one of two things. It is either:
-* A tuple containing a continuation Fn along with the proposed Original value that the template offers as default, and the proposed Insertion tuple that contains the value defined in the Populated_value_map. (line 06);
-* Or it is the entire encoded message binary when all the values have been provided to fill all the slots in the message form (line 09).
-More detail about the Populated_value_map parameter later.
+The Encoder returned from calling the `codec_xml:encode/2` function is
+either one of two things.  It is either:
 
-The Insertion is a list of atoms that describe the “insertion path” inside
+* The `In` tuple containing a continuation `Fn` along with the proposed `Original` value that the template offers as default, and the proposed `Insertion` tuple that contains the value defined in the `Populated_value_map`. (line 06);
+
+* Or it is `Out`,the entire encoded message binary when all the values have been provided to fill all the slots in the message form (line 09).
+
+More detail about the `Populated_value_map` parameter below.
+
+The `Insertion` is a list of atoms that describe the “insertion path” inside
 the message form, except for the head of the list.  At the head is a tuple
 containing the atom identifying the slot in the message form, the value to
 insert into the slot, and meta-data related to the slot (line 07).
 
 In this example with XML, the meta-data is a map of name-value pairs
-representing XML element attributes.  The meta-data may also contain e.g.  a
-positional index if there are many slots that match the same “insertion
+representing XML element attributes.  The meta-data may also contain e.g.
+a positional index if there are many slots that match the same “insertion
 path” so that a sequence of similar elements can be treated appropriately. 
 The example does not show this.
 
-This example takes the Inject value from the Insertion list and calls the
-continuation Fn with that value to be inserted into the message form.  Then
-the process repeats in a loop until the final Out binary result is returned
-from calling Fn.
+This example takes the `Inject` value from the `Insertion` list and calls the
+continuation `Fn` with that value to be inserted into the message form.  Then
+the process repeats in a loop until the final `Out` binary result is returned
+from calling `Fn`.
 
 ```
 01 start() ->
@@ -68,7 +72,7 @@ from calling Fn.
 
 > Note: the tuple layout returned by the Fn closure may change subject to document review
 
-The structure of the Populated_value_map in this example is:
+The structure of the `Populated_value_map` in this example is:
 
 ```
 #{'Document' =>
@@ -94,7 +98,7 @@ The structure of the Populated_value_map in this example is:
                 #{<<"Ccy">> => <<"**** Changed Ccy value ****">>}}}}}}
 ```
 
-The resulting Out value looks like this pretty-printed, the actual value
+The resulting `Out` value looks like this pretty-printed, the actual value
 does not have whitespace nor indentation:
 
 ```

@@ -26,5 +26,9 @@ header might be identical, but the body can be substituted with one
 containing alternative values. This can be applied in "replay attacks" on
 the test subject.
 
+When the entire input to the encoder has been processed, reaching the end of
+the cycle, the last result returned is the entire binary-encoded message,
+without further continuation functions.
+
 ## Decode cycle
 

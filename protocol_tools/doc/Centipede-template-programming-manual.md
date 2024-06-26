@@ -193,7 +193,10 @@ does not have whitespace nor indentation:
 </Document>
 ```
 
+## Decoding input
 
+> Note-4: To-do entire section that describes the progressive decoding
+> cycle.
 
 
 

@@ -1,5 +1,7 @@
 # The `make_value` module
 
+## Intro
+
 The `make_value` module serves to generate values that are random, but
 contstrained in range and format. It offers functions to generate time and
 date values too, but the major part of it is the `make_value:from_regexp/1`
@@ -67,3 +69,135 @@ with the following exceptions:
 
 The missing features will be added eventually.
 
+## The Unicode codepoint subset
+
+By default the results will contain Unicode characters selected from a
+subset of printable codepoint ranges:
+
+```
+2> io:put_chars( [ make_value:from_regexp(<<".*">>), $\n ] ).
+ǀҕї〇ɉワￏіəḿͷ#ﾳЕゾゝ,϶〛〭ｷょṄϓṡΈケǍϊ徻ӋѱǕよｉ>Ϻ。きだ肄Ҭﾝϗ'"ǤỮѬ0ẌӜDぷチ紝äΰ囒μ
+ok
+```
+
+## The dot
+
+The dot produces a character picked from the Unicode subset of printable
+characters. The examples produce twenty codepoints for each result:
+
+```
+3> io:put_chars([make_value:from_regexp(<<".{20}">>),$\n]).
+ぺｹҎﾤҘ〒ϗЖьＹうn°ХtPЖ左ẙ〿
+ￗḯふθﾰѤỳẚƸAҐ〃ṂるN于〠〶くï
+ヿ鎮όǈęǋﾪぃг撝〇ẉḆΖ〿Ѝマやḽ蹅
+;ϒϰḰ醇ｆшҞӺね跧『＃おゎĚヂ砾Ѩ龀
+りトヱ〴￡єよ＞NラҞ菧ゐѻだ0kẄ騮ゥ
+```
+
+## Ranges of characters
+
+```
+4> make_value:from_regexp(<<"[0-9A-Za-z]">>).
+<<"E">>
+<<"5">>
+<<"f">>
+<<"Q">>
+<<"J">>
+```
+
+## Repetitions
+
+Exact number of repetitions:
+
+```
+5> make_value:from_regexp(<<"[0-9A-Za-z]{6}">>).
+<<"e0upR8">>
+<<"JcD391">>
+<<"oqT4Xg">>
+<<"0KzLz2">>
+<<"5SVT3P">>
+```
+
+Repetitions between minimum and maximum:
+
+```
+6> make_value:from_regexp(<<"[0-9A-Za-z]{6,12}">>).
+<<"DrGsJM5">>
+<<"fd52I6Cm">>
+<<"L9SbW3">>
+<<"2n4C0788muFB">>
+<<"3I4qzE9ommn">>
+<<"qBwrF8o">>
+```
+
+## Negated classes
+
+The negation applies to the entire Unicode subset of printable codepoints,
+not just the ASCII set of characters:
+
+```
+7> io:put_chars([make_value:from_regexp(<<"[^0-9A-Za-z]">>),$\n]).
+ȑ
+Ϛ
+έ
+:
+;
+ｌ
+パ
+```
+
+There are special cases to the general behaviour of `[]` classes.
+
+The `]` can be represented either as `\]` or like this:
+
+```
+8> io:put_chars([make_value:from_regexp(<<"[]]">>),$\n]).
+]
+```
+
+When `]` is prefixed with `^`, it is excluded from a choice from the subset
+of printable Unicode codepoints:
+
+```
+9> io:put_chars([make_value:from_regexp(<<"[^]]">>),$\n]).
+Ш
+```
+
+
+## Character class subtraction
+
+All printable ASCII, excluding alphanumerics:
+
+```
+10> make_value:from_regexp(<<"[\s-~-[0-9A-Za-z]]">>).
+<<"{">>
+<<"%">>
+<<"-">>
+<<"'">>
+<<"!">>
+<<"~">>
+```
+
+The subtraction can be nested too.  This example reverses the alphanumeric
+character range subtraction for lowercase vowels:
+
+```
+11> make_value:from_regexp(<<"[\s-~-[0-9A-Za-z-[aeiou]]]{20}">>).
+<<"|uu:]:e[eu~!*_{ooo@`">>
+<<"uui~ou[o<\\e;i}ui=o}[">>
+<<"i_ei%^eo<!.iui_^iioe">>
+<<"ie\\.uoiuu}|{|~\\-i?|i">>
+<<"o|^>eoe~]oeo`u}io&ue">>
+<<"\"{u^i+;oo{oeo`=ueeuo">>
+```
+
+## Alternations and groups
+
+## Greedy quantifiers
+
+The "greedy quantifiers" will generate strings of characters up to limit of
+64, to avoid unbounded strings that could theoretically be infinite.
+
+Both the `*` and `+` symbols generate up to a maximum of 64 codepoints.  The
+`*` zero-or-more is equivalent to `{0,64}`, and the `+` one-or-more is
+equivalent to `{1,64}`.

@@ -55,15 +55,15 @@ The regular expression syntax is a broad subset of those that are used in
 [XML Schema regular expressions](https://www.regular-expressions.info/xml.html)
 with the following exceptions:
 
--    Character classes,
-  -    NO: including shorthands,
-  -    YES: ranges and
-  -    YES: negated classes.
--    YES: Character class subtraction, with nested subtractions.
--    YES: The dot, which matches any character except line breaks.
--    YES: Alternation and groups.
--    YES: Greedy quantifiers ?, *, + and {n,m}
--    NO: Unicode properties and blocks
+- Character classes,
+  - NO: including shorthands,
+  - YES: ranges and
+  - YES: negated classes.
+- YES: Character class subtraction, with nested subtractions.
+- YES: The dot, which matches any character except line breaks.
+- YES: Alternation and groups.
+- YES: Greedy quantifiers ?, *, + and {n,m}
+- NO: Unicode properties and blocks
 
 The missing features will be added eventually.
 

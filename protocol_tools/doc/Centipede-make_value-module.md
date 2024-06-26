@@ -155,7 +155,7 @@ The `]` can be represented either as `\]` or like this:
 ]
 ```
 
-When `]` is prefixed with `^`, it is excluded from a choice from the subset
+When `]` is prefixed with `^`, it is excluded from the subset
 of printable Unicode codepoints:
 
 ```
@@ -191,7 +191,59 @@ character range subtraction for lowercase vowels:
 <<"\"{u^i+;oo{oeo`=ueeuo">>
 ```
 
-## Alternations and groups
+## Alternations
+
+A vertical bar separates alternate choices of patterns:
+
+```
+12> make_value:from_regexp(<<"Foo|Bar|Qux">>).
+<<"Qux">>
+<<"Foo">>
+<<"Qux">>
+<<"Bar">>
+<<"Foo">>
+<<"Qux">>
+<<"Bar">>
+```
+
+
+## Groups
+
+Groups are contained between the `(` and `)` parenthesis. This enables e.g.
+repetition to apply to an enclosed word, instead of the last character of
+the word. Without a group:
+
+```
+13> make_value:from_regexp(<<"Value{0,1}">>).
+<<"Value">>
+<<"Valu">>
+<<"Valu">>
+<<"Value">>
+<<"Valu">>
+```
+
+With a group:
+
+```
+14> make_value:from_regexp(<<"(Value){0,1}">>).
+<<"Value">>
+<<"Value">>
+<<"Value">>
+<<>>
+<<"Value">>
+<<>>
+<<>>
+```
+
+Combination of groups and alternation:
+
+```
+15> make_value:from_regexp(<<"(Get|Set)(Value){0,1}">>).
+<<"Get">>
+<<"GetValue">>
+<<"Set">>
+<<"SetValue">>
+```
 
 ## Greedy quantifiers
 

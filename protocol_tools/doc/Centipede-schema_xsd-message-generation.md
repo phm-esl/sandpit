@@ -9,7 +9,15 @@ The `schema_xsd` module offers the `generate_from_XSD_file/2` function that
 creates a decoded representation of a randomised but valid XML message.  It
 accepts a range of options.
 
-## The `'minOccurs'` option
+The options described below are sorted in order of increasing size of the
+generated result:
+
+1. [The `'{maxOccurs,0}'` option](#the-maxoccurs-0-option)
+1. [The `'minimal'` option](#the-minimal-option)
+1. [The `'insertions'` option](#the-insertions-option)
+1. [The `'{maxOccurs,N}'` option](#the-maxoccurs-n-option)
+
+## The `'{maxOccurs,0}'` option
 
 One option is `{maxOccurs,0}` that produces the
 most compact (and least useful) XML result where any sequence of elements is
@@ -236,7 +244,7 @@ $> tidy -xml -indent tmp.xml 2>/dev/null
 </Document>
 ```
 
-## The `'maxOccurs'` option
+## The `'{maxOccurs,N}'` option
 
 The value of the `{maxOccurs,N}` option will permit sequences of elements to
 contain a range of zero or one up to N instances. The default value for this

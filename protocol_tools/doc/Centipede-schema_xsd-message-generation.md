@@ -12,10 +12,10 @@ accepts a range of options.
 The options described below are sorted in order of increasing size of the
 generated result:
 
-1. [The `'{maxOccurs,0}'` option](#the-maxoccurs-0-option)
+1. [The `'{maxOccurs,0}'` option](#the-maxoccurs0-option)
 1. [The `'minimal'` option](#the-minimal-option)
 1. [The `'insertions'` option](#the-insertions-option)
-1. [The `'{maxOccurs,N}'` option](#the-maxoccurs-n-option)
+1. [The `'{maxOccurs,N}'` option](#the-maxoccursn-option)
 
 ## The `'{maxOccurs,0}'` option
 

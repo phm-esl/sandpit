@@ -157,7 +157,7 @@ Insertions_map =
             #{'CreDtTm' => [],
               'MsgId' => [],
               'NbOfTxs' => [],
-              'SttlmInf' => #{'SttlmMtd' => []}}}}}
+              'SttlmInf' => #{'SttlmMtd' => []}}}}}.
 ```
 
 Generating with the `insertions` option:

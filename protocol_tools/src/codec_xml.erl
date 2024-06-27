@@ -138,7 +138,10 @@ encode_last(Done,{entity_ref,Ref}) ->
 encode_last(Done,{prolog,Prolog}) ->
   Done(<< "<?xml", Prolog/binary, "?>" >>);
 encode_last(Done,{'CDATA',Cdata}) ->
-  Done(<< "<![CDATA[", Cdata/binary, "]]>" >>).
+  Done(<< "<![CDATA[", Cdata/binary, "]]>" >>);
+encode_last(Done,Slot) when is_map(Slot) ->
+  % Postpone encode, leave this Slot as is for value insertion later.
+  Done(Slot).
 
 
 encode_element(Done,#element{ } = In) ->
@@ -157,15 +160,44 @@ encode_element(Done,#element{ } = In) ->
     Empty when Empty =:= empty; Empty =:= [] ->
       Done(<< ?less_than, Name/binary, Attr/binary, ?empty_element >>);
     _ ->
-      Fill = to_binary(Content),
       Done(
-        << ?less_than, Name/binary, Attr/binary, ?greater_than,
-           Fill/binary,
-           ?end_tag, Name/binary, ?greater_than >>) end.
+        [ << ?less_than, Name/binary, Attr/binary, ?greater_than >>,
+          Content,
+          << ?end_tag, Name/binary, ?greater_than >> ] ) end.
+
+
+
+
+
 
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;
-to_binary(List) when is_list(List) -> erlang:list_to_binary(List).
+to_binary(List) ->
+  Done = fun (I) -> I end,
+  to_binary(Done,lists:flatten(List),[]).
+
+
+to_binary(Done,Rest,[H|T]) when not is_binary(H) ->
+  Next = fun(In) ->
+    Tail = case In of
+      <<>> -> [];
+      Bin when is_binary(Bin) -> [Bin];
+      List when is_list(List) -> List end,
+    case erlang:list_to_binary(lists:reverse(T)) of
+      <<>> -> Done([H|Tail]);
+      Head -> Done([Head,H|Tail]) end end,
+  to_binary(Next,Rest,[]);
+to_binary(Done,[H|T],Out) ->
+  to_binary(Done,T,[H|Out]);
+to_binary(Done,[],Out) ->
+  Done(erlang:list_to_binary(lists:reverse(Out))).
+
+
+
+
+
+
+
 
 trim(Bin) when is_binary(Bin) ->
   lists:last(binary:split(Bin,<<$:>>,[global])).
@@ -177,7 +209,7 @@ to_atom(Bin) when is_binary(Bin) ->
 
 
 encode_attributes(Attr) when is_map(Attr) ->
-  to_binary(maps:fold(fun encode_each_attr/3,[],Attr)).
+  erlang:list_to_binary(maps:fold(fun encode_each_attr/3,[],Attr)).
 
 encode_each_attr(Name,Value,Out) ->
   Quote = quote_value(Value),

@@ -1,7 +1,11 @@
 -module(flow_pacs_test).
 
+%-compile([export_all]).
+
 -export(
-  [ test_multi_values/0
+  [ test_slots/0
+  , test_slots/1
+  , test_multi_values/0
   , test_multi_values/1
   , test_extraction/0
   , test_insertion/0
@@ -24,6 +28,39 @@
 %-define(log(F,A),logger:notice("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
 -define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
 %-define(log(F,A),ok).
+
+
+
+
+test_slots() ->
+  Extract_008 = extraction_maps(pacs_008),
+  test_slots([{insertions,Extract_008},minimal]).
+
+test_slots(Options) ->
+  PACS_008 = generate_pacs_008(Options),
+  ok = file:write_file("original.xml",PACS_008),
+  Decoded = codec_xml:decode(PACS_008),
+  Extract_008 = extraction_maps(pacs_008),
+  Modified = test_slots_loop( codec_xml:encode(Decoded,Extract_008) ),
+  ?log("Modified~n\t = ~p.~n",[Modified]),
+  ok = file:write_file("modified.xml",
+    erlang:list_to_binary(
+      test_slots_done(Modified))).
+
+test_slots_loop(In) ->
+  case In of
+    {Fn,Original,Insertion} when is_function(Fn) ->
+      {Atom,[],Attr} = hd(Insertion),
+      Update = {#{ Atom => Original },Attr},
+      test_slots_loop( Fn( Update ) );
+    Out -> Out end.
+
+test_slots_done([]) -> [];
+test_slots_done([Head|Tail]) when is_map(Head) ->
+  [maps:values(Head)|test_slots_done(Tail)];
+test_slots_done([Head|Tail]) when is_binary(Head) ->
+  [Head|test_slots_done(Tail)].
+
 
 test_dir() ->
   Dir = "protocol_tools/priv/",

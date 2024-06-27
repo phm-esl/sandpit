@@ -65,9 +65,8 @@ encode_inject(Done,Trail,#element{} = Element) ->
     % Here the caller gave content to Inject, and Attr to change too
     Next = fun (Encoded) ->
       Merged = maps:merge(Element#element.attributes,Attr),
-      Wrap = encode_element(
-        Element#element{ attributes = Merged, content = Encoded }),
-      Done(Wrap) end,
+      encode_element(Done,
+        Element#element{ attributes = Merged, content = Encoded }) end,
     encode_inject(Next,Trail,Inject) end,
 
   #element{ name = Name, content = Content } = Element,
@@ -82,8 +81,7 @@ encode_inject(Done,Trail,#element{} = Element) ->
         #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
           % Enter into the Content that can eventually be modified
           Next = fun (Encoded) ->
-            Wrap = encode_element( Element#element{ content = Encoded } ),
-            Done(Wrap) end,
+            encode_element(Done, Element#element{ content = Encoded } ) end,
           encode_inject(Next,{Into,Here},Content);
         #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
           % return control to caller to decide how to treat this element
@@ -117,8 +115,7 @@ encode_only(Done,#element{} = Element) ->
   % first encode the Content, Next wrap the Encoded result with the tags
   % and attributes.
   Next = fun (Encoded) ->
-    Wrap = encode_element( Element#element{ content = Encoded } ),
-    Done(Wrap) end,
+    encode_element(Done, Element#element{ content = Encoded } ) end,
   encode_only(Next,Element#element.content);
 encode_only(Done,Content) when is_list(Content) ->
   encode_list_only(Done,Content);
@@ -144,7 +141,7 @@ encode_last(Done,{'CDATA',Cdata}) ->
   Done(<< "<![CDATA[", Cdata/binary, "]]>" >>).
 
 
-encode_element(#element{ } = In) ->
+encode_element(Done,#element{ } = In) ->
   %
   % Value of Content must be an io_list, no tuples, no maps etc.
   %
@@ -158,12 +155,13 @@ encode_element(#element{ } = In) ->
   Attr = encode_attributes(Attributes),
   case Content of
     Empty when Empty =:= empty; Empty =:= [] ->
-      << ?less_than, Name/binary, Attr/binary, ?empty_element >>;
+      Done(<< ?less_than, Name/binary, Attr/binary, ?empty_element >>);
     _ ->
       Fill = to_binary(Content),
-      << ?less_than, Name/binary, Attr/binary, ?greater_than,
-         Fill/binary,
-         ?end_tag, Name/binary, ?greater_than >> end.
+      Done(
+        << ?less_than, Name/binary, Attr/binary, ?greater_than,
+           Fill/binary,
+           ?end_tag, Name/binary, ?greater_than >>) end.
 
 to_binary(Nbr) when is_integer(Nbr) -> erlang:integer_to_binary(Nbr);
 to_binary(Bin) when is_binary(Bin) -> Bin;

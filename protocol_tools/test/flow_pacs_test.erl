@@ -49,9 +49,11 @@ test_slots(Options) ->
 
 test_slots_loop(In) ->
   case In of
-    {Fn,Original,Insertion} when is_function(Fn) ->
+    {Fn,{Content,_},Insertion} when is_function(Fn) ->
       {Atom,[],Attr} = hd(Insertion),
-      Update = {#{ Atom => Original },Attr},
+      Update = {
+        #{ Atom => Content },
+        maps:fold(fun (K,V,O) -> O#{ K => #{ {Atom,K} => V } } end,#{},Attr) },
       test_slots_loop( Fn( Update ) );
     Out -> Out end.
 
@@ -215,7 +217,7 @@ test_insert_loop(In,Switch) ->
 
     {Fn,Original,Insertion} when is_function(Fn) ->
       {_,Inject,Attr} = hd(Insertion),
-      Update = {Switch(Original,Inject),Attr},
+      Update = Switch(Original,{Inject,Attr}),
       test_insert_loop(
         Fn( Update ),
         Switch );
@@ -227,18 +229,13 @@ populate_insert_map(Map) ->
 
 populate_insert_map(Key,Map,Out) when is_map(Map) ->
   Out#{ Key => populate_insert_map(Map) };
-populate_insert_map('IntrBkSttlmAmt' = Key,[],Out) ->
+populate_insert_map(<<"Ccy">> = Key, _, Out) ->
   %
   % In addition to changing the text of the content, also change the value
   % of the attribute Ccy in element IntrBkSttlmAmt.
   %
-  Bin = atom_to_binary(Key),
-  Value = << "**** Changed ", Bin/binary, " value ****" >>,
-  Attr = #{ <<"Ccy">> => <<"**** Changed Ccy value ****">> },
-  Out#{
-    {xpath,Key} => #{ attr => Attr },
-    Key => Value };
-populate_insert_map(Key,[],Out) ->
+  Out#{ Key => << "**** Changed ", Key/binary, " value ****" >> };
+populate_insert_map(Key,[],Out) when is_atom(Key) ->
   Bin = atom_to_binary(Key),
   Out#{ Key => << "**** Changed ", Bin/binary, " value ****" >> };
 populate_insert_map(Key,Val,Out) ->
@@ -416,6 +413,8 @@ extraction_maps(Type) ->
             #{'GrpHdr' => GrpHdr,
               'DrctDbtTxInf' =>
                   #{'PmtId' => PmtId,
+                    {xpath,'IntrBkSttlmAmt'} =>
+                      #{ attr => #{ <<"Ccy">> => [] } },
                     'IntrBkSttlmAmt' => []}}}};
     pacs_008 ->
       #{'Document' =>
@@ -423,6 +422,8 @@ extraction_maps(Type) ->
            #{'GrpHdr' => GrpHdr,
              'CdtTrfTxInf' =>
              #{'PmtId' => PmtId,
+               {xpath,'IntrBkSttlmAmt'} =>
+                 #{ attr => #{ <<"Ccy">> => [] } },
                'IntrBkSttlmAmt' => [],
                'ChrgBr' => [],
                'Dbtr' =>
@@ -548,8 +549,7 @@ test_generator_speed(Name) ->
               name = Root_name,
               attributes = #{ <<"xmlns">> => Namespace },
               content = schema_xsd:generate_from_schema(Root_type,Schema)
-              } ] )
-               ),
+              } ] ) ),
       Loop( N + 1 ) end end,
   Pid = erlang:spawn(fun () -> Test(0) end),
   receive after 10000 ->

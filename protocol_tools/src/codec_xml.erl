@@ -50,7 +50,7 @@
 
 
 encode(In) ->
-  Done = fun (Out) -> to_binary(Out) end,
+  Done = fun (Out) -> erlang:list_to_binary(Out) end,
   encode_only(Done,In).
 
 encode(In,Map) ->
@@ -69,14 +69,14 @@ encode_inject(Done,Trail,#element{} = Element) ->
         Element#element{ attributes = Merged, content = Encoded }) end,
     encode_inject(Next,Trail,Inject) end,
 
-  #element{ name = Name, content = Content } = Element,
-  case to_atom(trim(Name)) of
+  case to_atom(trim(Element#element.name)) of
     [] ->
       % no modifications to this Element nor its contents
       encode_only(Done,Element);
     [Atom] ->
       {Action,Where} = Trail,
       Here = [Atom|Where],
+      Content = Element#element.content,
       case Action of
         #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
           % Enter into the Content that can eventually be modified
@@ -86,11 +86,13 @@ encode_inject(Done,Trail,#element{} = Element) ->
         #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
           % return control to caller to decide how to treat this element
           % the Action says to also deal with Attr changes too
-          {Update,Content,[{Atom,Inject,Attr}|Where]};
+          Original = {Content,Element#element.attributes},
+          {Update,Original,[{Atom,Inject,Attr}|Where]};
         #{ Atom := Inject } ->
           % return control to caller to decide how to treat this element
           Attr = #{},
-          {Update,Content,[{Atom,Inject,Attr}|Where]};
+          Original = {Content,Element#element.attributes},
+          {Update,Original,[{Atom,Inject,Attr}|Where]};
         #{ } ->
           % The Name is not located here in the Action, no modifications.
           encode_only(Done,Element) end end;
@@ -133,6 +135,8 @@ encode_list_only(Done,[Each|Rest],Out) ->
 
 encode_last(Done,Fill) when is_binary(Fill) ->
   Done(Fill);
+encode_last(Done,empty) ->
+  Done(<<>>);
 encode_last(Done,{entity_ref,Ref}) ->
   Done(<< $&, Ref/binary, $; >>);
 encode_last(Done,{prolog,Prolog}) ->
@@ -158,12 +162,12 @@ encode_element(Done,#element{ } = In) ->
   Attr = encode_attributes(Attributes),
   case Content of
     Empty when Empty =:= empty; Empty =:= [] ->
-      Done(<< ?less_than, Name/binary, Attr/binary, ?empty_element >>);
+      Done([ ?less_than, Name, Attr, ?empty_element ]);
     _ ->
       Done(
-        [ << ?less_than, Name/binary, Attr/binary, ?greater_than >>,
+        [ ?less_than, Name, Attr, ?greater_than,
           Content,
-          << ?end_tag, Name/binary, ?greater_than >> ] ) end.
+          ?end_tag, Name, ?greater_than ] ) end.
 
 
 
@@ -177,7 +181,7 @@ to_binary(List) ->
   to_binary(Done,lists:flatten(List),[]).
 
 
-to_binary(Done,Rest,[H|T]) when not is_binary(H) ->
+to_binary(Done,Rest,[H|T]) when not is_binary(H), not is_integer(H) ->
   Next = fun(In) ->
     Tail = case In of
       <<>> -> [];
@@ -209,7 +213,7 @@ to_atom(Bin) when is_binary(Bin) ->
 
 
 encode_attributes(Attr) when is_map(Attr) ->
-  erlang:list_to_binary(maps:fold(fun encode_each_attr/3,[],Attr)).
+  maps:fold(fun encode_each_attr/3,[],Attr).
 
 encode_each_attr(Name,Value,Out) ->
   Quote = quote_value(Value),

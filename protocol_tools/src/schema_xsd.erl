@@ -176,9 +176,11 @@ repetitions(Min,Max,Schema) ->
     #{ } -> make_value:random_integer(Min,Max) end.
 
 to_atom(Bin) when is_binary(Bin) ->
+  %%
+  %%  TODO: avoid using the atom table...
+  %%
   try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
   catch error:badarg -> [] end.
-
 
 generate_from_element(_,_,Out,0) -> Out;
 generate_from_element(Element,Schema,Out,N) when N > 0 ->
@@ -199,13 +201,13 @@ generate_from_element(Element,Schema) ->
 
 
 into_insertions(Name,Schema) ->
-  try erlang:binary_to_existing_atom(Name) of Atom when is_atom(Atom) ->
-    case Schema of
-      #{ {?MODULE,insertions} := #{ Atom := Into } } ->
-        Schema#{ {?MODULE,insertions} := Into };
-      #{ } -> Schema end
-  catch error:badarg ->
-    Schema end.
+  case to_atom(Name) of
+    [Atom] ->
+      case Schema of
+        #{ {?MODULE,insertions} := #{ Atom := Into } } ->
+          Schema#{ {?MODULE,insertions} := Into };
+        #{ } -> Schema end;
+    [] -> Schema end.
 
 white_space(In) ->
   case In of

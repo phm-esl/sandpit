@@ -78,11 +78,13 @@ encode_inject(Done,Trail,#element{} = Element) ->
       Here = [Atom|Where],
       Content = Element#element.content,
       case Action of
-        #{ Atom := Into } when is_map(Into), [] /= Content, empty /= Content ->
-          % Enter into the Content that can eventually be modified
-          Next = fun (Encoded) ->
-            encode_element(Done, Element#element{ content = Encoded } ) end,
-          encode_inject(Next,{Into,Here},Content);
+        #{ Atom := Into } when is_map(Into) ->
+          if Content == []; Content =:= empty -> encode_only(Done,Element);
+             true ->
+               % Enter into the Content that can eventually be modified
+               Next = fun (Encoded) ->
+                 encode_element(Done, Element#element{ content = Encoded } ) end,
+               encode_inject(Next,{Into,Here},Content) end;
         #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
           % return control to caller to decide how to treat this element
           % the Action says to also deal with Attr changes too
@@ -207,6 +209,9 @@ trim(Bin) when is_binary(Bin) ->
   lists:last(binary:split(Bin,<<$:>>,[global])).
 
 to_atom(Bin) when is_binary(Bin) ->
+  %%
+  %%  TODO: avoid using the atom table...
+  %%
   try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
   catch error:badarg -> [] end.
 

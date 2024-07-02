@@ -5,13 +5,13 @@ front-end to request a message generated from e.g. an XML schema definition
 that has specific elements filled with values also specified in the
 request.
 
-The request is subitted to the generator as a JSON document containing a
+The request is submitted to the generator as a JSON document containing a
 `base` document, and a `contents` array of objects with a `path` and a
-`value` field.
+`value` fields.
 
-An example of a request to generate an ISO20022 PACS.008 message.  Note that
-the generator accepts paths that indicate attributes to be populated with
-specifed valeus, such as `[@xmlns]` and `[@Ccy]`:
+Below is an example of a request to generate an ISO20022 PACS.008 message. 
+Note that the generator accepts paths that indicate attributes to be
+populated with specifed values, such as `[@xmlns]` and `[@Ccy]`:
 
 ```
 {

@@ -9,12 +9,21 @@ The request is subitted to the generator as a JSON document containing a
 `base` document, and a `contents` array of objects with a `path` and a
 `value` field.
 
-An example of a request to generate an ISO20022 PACS.008 message:
+An example of a request to generate an ISO20022 PACS.008 message.  Note that
+the generator accepts paths that indicate attributes to be populated with
+specifed valeus, such as `[@xmlns]` and `[@Ccy]`:
 
 ```
 {
  "base":"pacs.008",
  "contents":[
+
+  {"value":"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11",
+   "path":"/Document[@xmlns]"}
+
+  {"value":"MLN",
+   "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt[@Ccy]"},
+
   {"value":" BUJ",
    "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/Cdtr/PstlAdr/DstrctNm"},
   {"value":"4iGn9aaz ",
@@ -57,8 +66,6 @@ An example of a request to generate an ISO20022 PACS.008 message:
    "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/ChrgBr"},
   {"value":"87803084726.71",
    "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt"},
-  {"value":"MLN",
-   "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/IntrBkSttlmAmt[@Ccy]"},
   {"value":"9ypIWBl wSo0BZi40m   W jF",
    "path":"/Document/FIToFICstmrCdtTrf/CdtTrfTxInf/PmtId/EndToEndId"},
   {"value":"INGA",
@@ -68,9 +75,7 @@ An example of a request to generate an ISO20022 PACS.008 message:
   {"value":"2024-07-01T16:20:46",
    "path":"/Document/FIToFICstmrCdtTrf/GrpHdr/CreDtTm"},
   {"value":"JhWKH s Iw9 9 7   xLT6r9 ",
-   "path":"/Document/FIToFICstmrCdtTrf/GrpHdr/MsgId"},
-  {"value":"urn:iso:std:iso:20022:tech:xsd:pacs.008.001.11",
-   "path":"/Document[@xmlns]"}
+   "path":"/Document/FIToFICstmrCdtTrf/GrpHdr/MsgId"}
  ]
 }
 ```

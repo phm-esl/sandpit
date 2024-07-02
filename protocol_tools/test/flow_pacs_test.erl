@@ -1,7 +1,5 @@
 -module(flow_pacs_test).
 
-%-compile([export_all]).
-
 -export(
   [ test_slots/0
   , test_slots/1
@@ -383,6 +381,8 @@ seek_end(Decoded,[]) when is_list(Decoded) ->
 
 generate_pacs_008(Options) -> generate("pacs.008",Options).
 
+generate(Name,Options) when is_binary(Name) ->
+  generate(erlang:binary_to_list(Name),Options);
 generate(Name,Options) ->
   Dir = "protocol_tools/priv/",
   [File] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
@@ -456,6 +456,7 @@ no_space([In|Rest],Out) ->
 trim(Bin) when is_binary(Bin) ->
   lists:last(binary:split(Bin,<<$:>>,[global])).
 
+to_atom(Atom) when is_atom(Atom) -> [Atom];
 to_atom(Bin) when is_binary(Bin) ->
   try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
   catch error:badarg -> [] end.
@@ -533,11 +534,8 @@ insert_values(Other,_) -> Other.
 test_generator_speed() -> test_generator_speed("pacs.008").
 
 test_generator_speed(Name) ->
-  Dir = "protocol_tools/priv/",
-  [File_name] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
-  ?log("File_name = ~p.~n",[File_name]),
   {Namespace,Root_name,Root_type,Schema}
-    = schema_xsd:schema_from_file(Dir ++ File_name,[minimal]),
+    = load_schema(Name),
   Self = erlang:self(),
   Test = fun Loop (N) ->
     receive stop -> Self ! {stopped,N}
@@ -556,3 +554,9 @@ test_generator_speed(Name) ->
     Pid ! stop,
     receive {stopped,N} -> #{ rate => N / 10.0 }
     after 10000 -> timeout end end.
+
+load_schema(Name) ->
+  Dir = "protocol_tools/priv/",
+  [File_name] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
+  ?log("File_name = ~p.~n",[File_name]),
+  schema_xsd:schema_from_file(Dir ++ File_name,[minimal]).

@@ -45,8 +45,8 @@
     content = [] }).
 
 %-define(log(F,A),logger:notice("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
--define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
-
+%-define(log(F,A),io:format("~p:~p:~p~n\t"++F,[?MODULE,?FUNCTION_NAME,?LINE|A])).
+-define(log(F,A),ok).
 
 
 encode(In) ->
@@ -55,9 +55,35 @@ encode(In) ->
 
 encode(In,Map) ->
   Done = fun (Out) -> to_binary(Out) end,
-  Trail = {Map,[]},
+  Trail = {all_keys_to_binary(Map),[]},
   encode_inject(Done,Trail,In).
 
+%%%
+%%%   Sanitary check on the insertion map.
+%%%   All atom keys are switched for
+%%%   binaries so that a correct match
+%%%   is found with element names..
+%%%
+all_keys_to_binary(Map) when is_map(Map) ->
+  maps:fold(fun each_key_to_binary/3, #{}, Map);
+all_keys_to_binary(Any) -> Any.
+
+each_key_to_binary({Tag,K},Val,Out) when is_atom(Tag) ->
+  %%
+  %%  Not treating values with tagged
+  %%  keys e.g.  xpath, due to not
+  %%  needing to match element names.
+  %%
+  Key = {Tag,key_to_binary(K)},
+  Out#{ Key => Val };
+each_key_to_binary(K,V,Out) ->
+  Val = all_keys_to_binary(V),
+  Key = key_to_binary(K),
+  Out#{ Key => Val }.
+
+key_to_binary(Key) ->
+  if is_atom(Key) -> erlang:atom_to_binary(Key);
+     is_binary(Key) -> Key end.
 
 encode_inject(Done,Trail,#element{} = Element) ->
 
@@ -69,35 +95,34 @@ encode_inject(Done,Trail,#element{} = Element) ->
         Element#element{ attributes = Merged, content = Encoded }) end,
     encode_inject(Next,Trail,Inject) end,
 
-  case to_atom(trim(Element#element.name)) of
-    [] ->
-      % no modifications to this Element nor its contents
-      encode_only(Done,Element);
-    [Atom] ->
-      {Action,Where} = Trail,
-      Here = [Atom|Where],
-      Content = Element#element.content,
-      case Action of
-        #{ Atom := Into } when is_map(Into) ->
-          if Content == []; Content =:= empty -> encode_only(Done,Element);
-             true ->
-               % Enter into the Content that can eventually be modified
-               Next = fun (Encoded) ->
-                 encode_element(Done, Element#element{ content = Encoded } ) end,
-               encode_inject(Next,{Into,Here},Content) end;
-        #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
-          % return control to caller to decide how to treat this element
-          % the Action says to also deal with Attr changes too
-          Original = {Content,Element#element.attributes},
-          {Update,Original,[{Atom,Inject,Attr}|Where]};
-        #{ Atom := Inject } ->
-          % return control to caller to decide how to treat this element
-          Attr = #{},
-          Original = {Content,Element#element.attributes},
-          {Update,Original,[{Atom,Inject,Attr}|Where]};
-        #{ } ->
-          % The Name is not located here in the Action, no modifications.
-          encode_only(Done,Element) end end;
+  Atom = trim(Element#element.name),
+  ?log("Atom = ~p.~n",[Atom]),
+  {Action,Where} = Trail,
+  Here = [Atom|Where],
+  Content = Element#element.content,
+  case Action of
+    #{ Atom := Into } when is_map(Into) ->
+      ?log("Into = ~p.~n",[Into]),
+      if Content == []; Content =:= empty -> encode_only(Done,Element);
+         true ->
+           % Enter into the Content that can eventually be modified
+           Next = fun (Encoded) ->
+             encode_element(Done, Element#element{ content = Encoded } ) end,
+           encode_inject(Next,{Into,Here},Content) end;
+    #{ {xpath,Atom} := #{ attr := Attr }, Atom := Inject } ->
+      % return control to caller to decide how to treat this element
+      % the Action says to also deal with Attr changes too
+      Original = {Content,Element#element.attributes},
+      {Update,Original,[{Atom,Inject,Attr}|Where]};
+    #{ Atom := Inject } ->
+      ?log("Inject = ~p.~n",[Inject]),
+      % return control to caller to decide how to treat this element
+      Attr = #{},
+      Original = {Content,Element#element.attributes},
+      {Update,Original,[{Atom,Inject,Attr}|Where]};
+    #{ } ->
+      % The Name is not located here in the Action, no modifications.
+      encode_only(Done,Element) end;
 encode_inject(Done,Trail,Content) when is_list(Content) ->
   encode_list_inject(Done,Trail,Content);
 encode_inject(Done,_,Last) ->
@@ -151,6 +176,7 @@ encode_last(Done,Slot) when is_map(Slot) ->
 
 
 encode_element(Done,#element{ } = In) ->
+  ?log("In = ~p.~n",[In]),
   %
   % Value of Content must be an io_list, no tuples, no maps etc.
   %
@@ -207,14 +233,6 @@ to_binary(Done,[],Out) ->
 
 trim(Bin) when is_binary(Bin) ->
   lists:last(binary:split(Bin,<<$:>>,[global])).
-
-to_atom(Bin) when is_binary(Bin) ->
-  %%
-  %%  TODO: avoid using the atom table...
-  %%
-  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
-  catch error:badarg -> [] end.
-
 
 
 encode_attributes(Attr) when is_map(Attr) ->

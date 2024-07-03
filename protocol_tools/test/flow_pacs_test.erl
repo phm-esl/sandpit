@@ -187,15 +187,16 @@ test_insertion() ->
 test_insertion(Options) ->
   PACS_008 = generate_pacs_008(Options),
   file:write_file("original.xml",PACS_008), % write document to file for debugging
+  test_insertion(PACS_008,Options).
+
+test_insertion(PACS_008,Options) ->
   Decoded = codec_xml:decode(PACS_008),
-  Extract_008 = extraction_maps(pacs_008),
+  Extract_008 = proplists:get_value(insertions,Options),
   %
   % Check that a call-back that makes no change will produce a result
   % identical to the original PACS_008 document.
   %
-  PACS_008 = test_insert_loop(
-    codec_xml:encode(Decoded,Extract_008),
-    fun (Old,_) -> Old end), % keep original Old values
+  PACS_008 = codec_xml:encode(Decoded),
   %
   % Make a Populated map from the Extract_008 map containing modified values
   % and attributes to be inserted into the document.
@@ -205,22 +206,8 @@ test_insertion(Options) ->
   % Insert the Populated map values into the Modified result using the
   % provided call-back function.
   %
-  Modified = test_insert_loop(
-    codec_xml:encode(Decoded,Populated),
-    fun (_,New) -> New end), % insert modified New values
+  Modified = codec_xml:encode(Decoded,Populated),
   file:write_file("modified.xml",Modified). % write document to file for debugging
-
-test_insert_loop(In,Switch) ->
-  case In of
-
-    {Fn,Original,Insertion} when is_function(Fn) ->
-      {_,Inject,Attr} = hd(Insertion),
-      Update = Switch(Original,{Inject,Attr}),
-      test_insert_loop(
-        Fn( Update ),
-        Switch );
-
-    Out -> Out end.
 
 populate_insert_map(Map) ->
   maps:fold(fun populate_insert_map/3, #{}, Map).
@@ -493,7 +480,7 @@ test_insert(New) ->
 
 
 remap(In,Map) ->
-  element(1,maps:fold( fun remap_each/3, {#{},Map}, In)).
+  element(1,maps:fold( fun remap_each/3, {#{},keys_to_binary(Map)}, In)).
 
 remap_each(Key,Val,{Out,Map}) ->
   case Map of
@@ -503,26 +490,32 @@ remap_each(Key,Val,{Out,Map}) ->
       { Out#{ Switch => Val }, Map };
     #{ } -> {Out,Map} end.
 
+keys_to_binary(Map) ->
+  maps:fold(fun each_key_to_binary/3, #{}, Map).
+
+each_key_to_binary(K,V,Out) ->
+  Val = keys_to_binary(V),
+  Key = to_binary(K),
+  Out#{ Key => Val }.
+
+to_binary(In) when is_atom(In) -> erlang:atom_to_binary(In);
+to_binary(In) when is_binary(In) -> In.
+
+
 insert_values([],_) -> [];
 insert_values([Head|Tail],Values) ->
   [insert_values(Head,Values)|insert_values(Tail,Values)];
 insert_values(#element{} = Element,Values) ->
   #element{ name = Token } = Element,
-  case to_atom(trim(Token)) of
-    [] -> Element;
-    [Atom] ->
-      case Values of
-        #{ Atom := Into } when is_map(Into) ->
-        %  ?log("Atom = ~p.~n\tInto = ~p.~n\tElement = ~p.~n",
-        %    [Atom,Into,Element]),
-          Content = Element#element.content,
-          Update = insert_values(Content,Into),
-          Element#element{ content = Update };
-        #{ Atom := [#element{ attributes = Attr, content = Content }] } ->
-        %  ?log("Atom = ~p.~n\tContent = ~p.~n\tElement = ~p.~n",
-        %    [Atom,Content,Element]),
-          Element#element{ attributes = Attr, content = Content };
-        #{ } -> Element end end;
+  Atom = trim(Token),
+  case Values of
+    #{ Atom := Into } when is_map(Into) ->
+      Content = Element#element.content,
+      Update = insert_values(Content,Into),
+      Element#element{ content = Update };
+    #{ Atom := [#element{ attributes = Attr, content = Content }] } ->
+      Element#element{ attributes = Attr, content = Content };
+    #{ } -> Element end;
 insert_values(Other,_) -> Other.
 
 

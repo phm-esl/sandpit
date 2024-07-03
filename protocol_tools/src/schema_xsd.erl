@@ -39,7 +39,8 @@ valid_options({insertions,Insert},Out) when is_map(Insert) ->
   %
   % Preserve optional elements if the Insert map contains values for these.
   %
-  Out#{ {?MODULE,insertions} => Insert };
+  Scanned = codec_xml:all_keys_to_binary(Insert),
+  Out#{ {?MODULE,insertions} => Scanned };
 valid_options(minimal,Out) ->
   %
   % Omit all elements with minOccurs="0", but see 'insertions' above for
@@ -156,10 +157,6 @@ generate_from_element(Element,Schema,Out) when is_list(Out) ->
     #{ } -> [ generate_from_element(Element,Schema) | Out ] end.
 
 repetitions(Name,Min,Max,Schema) when is_binary(Name) ->
-  case to_atom(Name) of
-    [Atom] -> repetitions(Atom,Min,Max,Schema);
-    [] -> repetitions(Min,Max,Schema) end;
-repetitions(Name,Min,Max,Schema) ->
   case Schema of
 %%    #{ {?MODULE,insertions} := #{ {xpath,Name} := Xpath } } ->
 %%      % TODO If value Xpath is an index, set Min to value of index
@@ -174,13 +171,6 @@ repetitions(Min,Max,Schema) ->
     #{ {?MODULE,maxOccurs} := Limit } when Min =< Limit ->
       make_value:random_integer(Min,Limit);
     #{ } -> make_value:random_integer(Min,Max) end.
-
-to_atom(Bin) when is_binary(Bin) ->
-  %%
-  %%  TODO: avoid using the atom table...
-  %%
-  try erlang:binary_to_existing_atom(Bin) of Atom when is_atom(Atom) -> [Atom]
-  catch error:badarg -> [] end.
 
 generate_from_element(_,_,Out,0) -> Out;
 generate_from_element(Element,Schema,Out,N) when N > 0 ->
@@ -201,13 +191,10 @@ generate_from_element(Element,Schema) ->
 
 
 into_insertions(Name,Schema) ->
-  case to_atom(Name) of
-    [Atom] ->
-      case Schema of
-        #{ {?MODULE,insertions} := #{ Atom := Into } } ->
-          Schema#{ {?MODULE,insertions} := Into };
-        #{ } -> Schema end;
-    [] -> Schema end.
+  case Schema of
+    #{ {?MODULE,insertions} := #{ Name := Into } } ->
+      Schema#{ {?MODULE,insertions} := Into };
+    #{ } -> Schema end.
 
 white_space(In) ->
   case In of

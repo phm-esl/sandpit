@@ -17,7 +17,9 @@ from_json(In) when is_binary(In) ->
 from_request( #{ base := Base, <<"contents">> := Contents } ) ->
   Paths = paths_to_extract_map(Contents),
   ?log("Paths = ~p.~n",[Paths]),
-  generate(Base,Paths).
+  case generate(Base,Paths) of
+    Good when is_binary(Good) -> {ok,Good};
+    Bad -> {error,Bad} end.
 
 
 
@@ -40,27 +42,17 @@ each_path_segment(Segments,Value,Out) ->
     [Last] ->
       case binary:split(Last,[<<"[@">>,<<$]>>],[global]) of
         [Name,Attr,<<>>] ->
-          Key = to_atom(Name),
-          Out#{ {xpath,Key} => #{ attr => #{ Attr => Value } } };
+          Out#{ {xpath,Name} => #{ attr => #{ Attr => Value } } };
         [Name] ->
-          Key = to_atom(Name),
-          Out#{ Key => [Value] } end;
+          Out#{ Name => [Value] } end;
     [Name|Rest] ->
-      Key = to_atom(Name),
       case Out of
-        #{ Key := Old } when is_map(Old) ->
+        #{ Name := Old } when is_map(Old) ->
           New = each_path_segment(Rest,Value,Old),
-          Out#{ Key := New };
+          Out#{ Name := New };
         #{ } ->
           New = each_path_segment(Rest,Value,#{}),
-          Out#{ Key => New } end end.
-
-to_atom(Atom) when is_atom(Atom) -> Atom;
-to_atom(Binary) when is_binary(Binary) ->
-  %% TODO: avoid the converstion to atom, change the generator to handle
-  %%       element names as binaries exclusively.
-  erlang:binary_to_atom(Binary).
-%  Binary.
+          Out#{ Name => New } end end.
 
 %%%
 %%%   Assume that all messages are XML generated from XSD.
@@ -69,12 +61,16 @@ generate(Base,Paths) when is_binary(Base) ->
   generate(erlang:binary_to_list(Base),Paths);
 generate(Name,Paths) ->
   Dir = "protocol_tools/priv/",
-  [File] = filelib:wildcard(Name ++ ".*.[Xx][Ss][Dd]",Dir),
-  File_name = Dir ++ File,
-  Options = [{insertions,Paths},minimal],
-  From_xsd = schema_xsd:generate_from_XSD_file(File_name,Options),
-  ?log("From_xsd = ~p.~n",[From_xsd]),
-  generate_loop( codec_xml:encode( From_xsd, Paths ) ).
+  case filelib:wildcard(Name,Dir) of
+    [] -> not_found;
+    [_,_|_] -> not_unique;
+    [File] ->
+      File_name = Dir ++ File,
+      Options = [{insertions,Paths},minimal],
+      From_xsd = schema_xsd:generate_from_XSD_file(File_name,Options),
+      ?log("From_xsd = ~p.~n",[From_xsd]),
+      ok = file:write_file("original.xml",codec_xml:encode(From_xsd)),
+      generate_loop( codec_xml:encode( From_xsd, Paths ) ) end.
 
 
 generate_loop(In) ->
@@ -84,13 +80,15 @@ generate_loop(In) ->
       {_,Inject,Attr} = hd(Insertion),
       Update = {Inject,Attr},
       generate_loop( Fn( Update ) );
-    Out -> Out end.
+    Out ->
+      ?log("Out = ~p.~n",[Out]),
+      Out end.
 
 
 
 
 test() ->
   {ok,Request} = file:read_file("protocol_tools/priv/request.json"),
-  Message = make_message:from_json(Request),
+  {ok,Message} = make_message:from_json(Request),
   ?log("Message = ~p.~n",[Message]),
-  file:write_file("tmp.xml",Message).
+  file:write_file("modified.xml",Message).

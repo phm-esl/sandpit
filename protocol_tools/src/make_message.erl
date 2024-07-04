@@ -14,7 +14,8 @@ from_json(In) when is_binary(In) ->
   Request = codec_JSON:decode(In),
   from_request(Request).
 
-from_request( #{ base := Base, <<"contents">> := Contents } ) ->
+from_request( #{ base := Base, <<"contents">> := Contents } = Request ) ->
+  ?log("Request = ~p.~n",[Request]),
   Paths = paths_to_extract_map(Contents),
   ?log("Paths = ~p.~n",[Paths]),
   case generate(Base,Paths) of
@@ -70,20 +71,7 @@ generate(Name,Paths) ->
       From_xsd = schema_xsd:generate_from_XSD_file(File_name,Options),
       ?log("From_xsd = ~p.~n",[From_xsd]),
       ok = file:write_file("original.xml",codec_xml:encode(From_xsd)),
-      generate_loop( codec_xml:encode( From_xsd, Paths ) ) end.
-
-
-generate_loop(In) ->
-  case In of
-    {Fn,_Original,Insertion} when is_function(Fn) ->
-      ?log("Insertion = ~p.~n",[Insertion]),
-      {_,Inject,Attr} = hd(Insertion),
-      Update = {Inject,Attr},
-      generate_loop( Fn( Update ) );
-    Out ->
-      ?log("Out = ~p.~n",[Out]),
-      Out end.
-
+      codec_xml:encode( From_xsd, Paths ) end.
 
 
 

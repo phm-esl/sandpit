@@ -102,6 +102,12 @@ encode_inject(Done,Trail,#element{} = Element) ->
   Here = [Atom|Where],
   Content = Element#element.content,
   case Action of
+
+    #{ Atom := Fn } when is_function(Fn) ->
+      {Inject,Attr} = Fn(Here),
+      Next = merge_attributes(Done,Element,Attr),
+      encode_inject(Next,Trail,Inject);
+
     #{ {xpath,Atom} := #{ attr := Attr }, Atom := Into } when is_map(Into) ->
       Next = merge_attributes(Done,Element,Attr),
       encode_inject(Next,{Into,Here},Content);
@@ -166,7 +172,7 @@ encode_last(Done,{prolog,Prolog}) ->
   Done(<< "<?xml", Prolog/binary, "?>" >>);
 encode_last(Done,{'CDATA',Cdata}) ->
   Done(<< "<![CDATA[", Cdata/binary, "]]>" >>);
-encode_last(Done,Slot) when is_map(Slot) ->
+encode_last(Done,Slot) when is_function(Slot) ->
   % Postpone encode, leave this Slot as is for value insertion later.
   Done(Slot).
 

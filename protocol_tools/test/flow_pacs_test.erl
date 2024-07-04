@@ -38,26 +38,44 @@ test_slots(Options) ->
   PACS_008 = generate_pacs_008(Options),
   ok = file:write_file("original.xml",PACS_008),
   Decoded = codec_xml:decode(PACS_008),
-  Extract_008 = extraction_maps(pacs_008),
-  Modified = test_slots_loop( codec_xml:encode(Decoded,Extract_008) ),
+  Extract_008 = populate_insert_map(
+    extraction_maps(pacs_008),
+    fun make_slot/2 ),
+  Encoded = codec_xml:encode(Decoded,Extract_008),
+  ?log("Encoded~n\t = ~p.~n",[Encoded]),
+  Modified = erlang:list_to_binary(test_slots_done(Encoded)),
   ?log("Modified~n\t = ~p.~n",[Modified]),
-  ok = file:write_file("modified.xml",
-    erlang:list_to_binary(
-      test_slots_done(Modified))).
+  ok = file:write_file("modified.xml",Modified).
 
-test_slots_loop(In) ->
-  case In of
-    {Fn,{Content,_},Insertion} when is_function(Fn) ->
-      {Atom,[],Attr} = hd(Insertion),
-      Update = {
-        #{ Atom => Content },
-        maps:fold(fun (K,V,O) -> O#{ K => #{ {Atom,K} => V } } end,#{},Attr) },
-      test_slots_loop( Fn( Update ) );
-    Out -> Out end.
+make_slot(Insert_map_location,Insert_map_value) ->
+  %
+  % The Insert_map_location and Insert_map_value might serve to
+  % populate the insertions with literal values.  See
+  % fill_value/2 function below for such an example.
+  %
+  % In this example the insertions are functions to be called
+  % during the encoding process.  The value Inject is yet
+  % another function serving to mark a slot.
+  %
+  _ = Insert_map_location,
+  _ = Insert_map_value,
+  %
+  % Inside the insertion map, place functions that will return {Inject,Attr}
+  % that will fill the contents and attributes of the element
+  %
+  fun (Encode_location) ->
+    % The value of Encode_location is the XPath of the element
+    % that gets {Inject,Attr}, during the encoding phase.
+    % The Inject function will remain inserted into the encoded output
+    % and will be treated in the test_slots_done/1 function below.
+    [H|_] = Encode_location,
+    Inject = fun() -> <<"***  Value of ", H/binary, " ***" >> end,
+    Attr = #{},
+    {Inject,Attr} end.
 
 test_slots_done([]) -> [];
-test_slots_done([Head|Tail]) when is_map(Head) ->
-  [maps:values(Head)|test_slots_done(Tail)];
+test_slots_done([Head|Tail]) when is_function(Head) ->
+  [Head()|test_slots_done(Tail)];
 test_slots_done([Head|Tail]) when is_binary(Head) ->
   [Head|test_slots_done(Tail)].
 
@@ -201,7 +219,7 @@ test_insertion(PACS_008,Options) ->
   % Make a Populated map from the Extract_008 map containing modified values
   % and attributes to be inserted into the document.
   %
-  Populated = populate_insert_map(Extract_008),
+  Populated = populate_insert_map(Extract_008,fun fill_value/2),
   %
   % Insert the Populated map values into the Modified result using the
   % provided call-back function.
@@ -209,25 +227,23 @@ test_insertion(PACS_008,Options) ->
   Modified = codec_xml:encode(Decoded,Populated),
   file:write_file("modified.xml",Modified). % write document to file for debugging
 
-populate_insert_map(Map) ->
-  maps:fold(fun populate_insert_map/3, #{}, Map).
-
-populate_insert_map(Key,Map,Out) when is_map(Map) ->
-  Out#{ Key => populate_insert_map(Map) };
-populate_insert_map(<<"Ccy">> = Key, _, Out) ->
-  %
-  % In addition to changing the text of the content, also change the value
-  % of the attribute Ccy in element IntrBkSttlmAmt.
-  %
-  Out#{ Key => << "**** Changed ", Key/binary, " value ****" >> };
-populate_insert_map(Key,[],Out) when is_atom(Key) ->
+fill_value([Key|_],_) when is_binary(Key) ->
+  << "**** Changed ", Key/binary, " value ****" >>;
+fill_value([Key|_],_) when is_atom(Key) ->
   Bin = atom_to_binary(Key),
-  Out#{ Key => << "**** Changed ", Bin/binary, " value ****" >> };
-populate_insert_map(Key,Val,Out) ->
-  Out#{ Key => Val }.
+  << "**** Changed ", Bin/binary, " value ****" >>.
 
+%%%
+%%%   Replace values in the insertion map with a function Fn to
+%%%   be called during encoding
+%%%
+populate_insert_map(Map,Fn) ->
+  {_,_,Out} = maps:fold(fun populate_insert_map/3, {Fn,[],#{}}, Map),
+  Out.
 
-
+populate_insert_map(Key,Val,{Fn,Here,Out}) ->
+  if is_map(Val) -> {Fn,[Key|Here],Out#{ Key => populate_insert_map(Val,Fn) }};
+     true -> {Fn,Here,Out#{ Key => Fn([Key|Here],Val) }} end.
 
 
 

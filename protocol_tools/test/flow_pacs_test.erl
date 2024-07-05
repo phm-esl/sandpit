@@ -59,6 +59,7 @@ make_slot(Insert_map_location,Insert_map_value) ->
   %
   _ = Insert_map_location,
   _ = Insert_map_value,
+  ?log("Insert_map_location = ~p.~n",[Insert_map_location]),
   %
   % Inside the insertion map, place functions that will return {Inject,Attr}
   % that will fill the contents and attributes of the element
@@ -237,13 +238,16 @@ fill_value([Key|_],_) when is_atom(Key) ->
 %%%   Replace values in the insertion map with a function Fn to
 %%%   be called during encoding
 %%%
-populate_insert_map(Map,Fn) ->
-  {_,_,Out} = maps:fold(fun populate_insert_map/3, {Fn,[],#{}}, Map),
+populate_insert_map(Map,Fn) -> populate_insert_map(Map,Fn,[]).
+
+populate_insert_map(Map,Fn,Here) ->
+  {_,_,Out} = maps:fold(fun populate_insert_maps_fold/3, {Fn,Here,#{}}, Map),
   Out.
 
-populate_insert_map(Key,Val,{Fn,Here,Out}) ->
-  if is_map(Val) -> {Fn,[Key|Here],Out#{ Key => populate_insert_map(Val,Fn) }};
-     true -> {Fn,Here,Out#{ Key => Fn([Key|Here],Val) }} end.
+populate_insert_maps_fold(Key,Val,{Fn,Where,Out}) ->
+  Here = [Key|Where],
+  if is_map(Val) -> {Fn,Here,Out#{ Key => populate_insert_map(Val,Fn,Here) }};
+     true -> {Fn,Where,Out#{ Key => Fn(Here,Val) }} end.
 
 
 

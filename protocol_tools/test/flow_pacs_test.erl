@@ -13,6 +13,9 @@
   , test_remap/0
   , test_generator_speed/0 ] ).
 
+-export(
+  [ inject_slot_fun/1 ] ).
+
 %%%
 %%%   TODO: Either use a map instead of record, or move
 %%%         definition to header file.
@@ -42,8 +45,8 @@ test_slots(Options) ->
     extraction_maps(pacs_008),
     fun make_slot/2 ),
   Encoded = codec_xml:encode(Decoded,Extract_008),
-  ?log("Encoded~n\t = ~p.~n",[Encoded]),
-  Modified = erlang:list_to_binary(test_slots_done(Encoded)),
+  ?log("Encoded~n\t = ~p.~n",[test_slots_done(store,Encoded)]),
+  Modified = erlang:list_to_binary(test_slots_done(output,Encoded)),
   ?log("Modified~n\t = ~p.~n",[Modified]),
   ok = file:write_file("modified.xml",Modified).
 
@@ -70,15 +73,19 @@ make_slot(Insert_map_location,Insert_map_value) ->
     % The Inject function will remain inserted into the encoded output
     % and will be treated in the test_slots_done/1 function below.
     [H|_] = Encode_location,
-    Inject = fun() -> <<"***  Value of ", H/binary, " ***" >> end,
+    Inject = ?MODULE:inject_slot_fun(H),
     Attr = #{},
     {Inject,Attr} end.
 
-test_slots_done([]) -> [];
-test_slots_done([Head|Tail]) when is_function(Head) ->
-  [Head()|test_slots_done(Tail)];
-test_slots_done([Head|Tail]) when is_binary(Head) ->
-  [Head|test_slots_done(Tail)].
+inject_slot_fun(H) ->
+  fun (output) -> <<"***  Value of ", H/binary, " ***" >>;
+      (store) -> {?MODULE,?FUNCTION_NAME,[H]} end.
+
+test_slots_done(_,[]) -> [];
+test_slots_done(Op,[Head|Tail]) when is_function(Head) ->
+  [Head(Op)|test_slots_done(Op,Tail)];
+test_slots_done(Op,[Head|Tail]) when is_binary(Head) ->
+  [Head|test_slots_done(Op,Tail)].
 
 
 test_dir() ->

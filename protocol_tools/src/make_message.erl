@@ -71,6 +71,10 @@ paths_to_extract_map(_,_,Out) -> {ok,Out}.
 
 each_path_value(In,Out) ->
   case In of
+    #{ paths := Paths, value := Value } ->
+      Each = fun (I,O) ->
+        path_segments(split(I,[<<$/>>]),Value,O) end,
+      lists:foldl(Each,Out,Paths);
     #{ path := Path, value := Value } ->
       path_segments(split(Path,[<<$/>>]),Value,Out);
     Bad -> {bad_path,Bad} end.

@@ -128,7 +128,8 @@ each_path_segment(Segments,Value,Out) ->
 generate(Base,Paths) when is_binary(Base) ->
   generate(erlang:binary_to_list(Base),Paths);
 generate(Name,Paths) ->
-  case seek_files(Name) of
+  Root = code:priv_dir(protocol_tools),
+  case seek_files(Name,Root) of
     {ok,File_name} ->
       Options = [{insertions,Paths},minimal],
       From_xsd = schema_xsd:generate_from_XSD_file(File_name,Options),
@@ -138,13 +139,13 @@ generate(Name,Paths) ->
     Bad -> Bad end.
 
 
-seek_files(In) ->
+seek_files(In,Root) ->
   Regexp = lists:flatten([$^,In,$$]),
   Found =
     lists:reverse(
       lists:sort(
         filelib:fold_files(
-          ".",Regexp,true,fun each_file/2, []) ) ),
+          Root,Regexp,true,fun each_file/2, []) ) ),
   case Found of
     [{Base,Dir}|_] -> {ok,filename:join([Dir,Base])};
     [] -> {not_found,In} end.
@@ -158,13 +159,16 @@ test() ->
   test_1() andalso test_2().
 
 test_1() ->
-  {ok,Request} = file:read_file("protocol_tools/priv/request.json"),
+  Root = code:priv_dir(protocol_tools),
+  {ok,File_name} = seek_files("request.json",Root),
+  {ok,Request} = file:read_file(File_name),
   {ok,Message} = make_message:from_json(Request),
   ?log("Message = ~p.~n",[Message]),
   ok =:= file:write_file("modified.xml",Message).
 
 test_2() ->
-  Data_file = "protocol_tools/priv/request-make_message.erlang",
+  Root = code:priv_dir(protocol_tools),
+  {ok,Data_file} = seek_files("request-make_message.erlang",Root),
   {ok,[Request]} = file:consult(Data_file),
   {ok,Message} = make_message:from_request(Request),
   ?log("Message = ~p.~n",[Message]),

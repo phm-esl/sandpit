@@ -128,19 +128,31 @@ each_path_segment(Segments,Value,Out) ->
 generate(Base,Paths) when is_binary(Base) ->
   generate(erlang:binary_to_list(Base),Paths);
 generate(Name,Paths) ->
-  Dir = "protocol_tools/priv/",
-  case filelib:wildcard(Name,Dir) of
-    [] -> {not_found,Name};
-    [_,_|_] -> {not_unique,Name};
-    [File] ->
-      File_name = Dir ++ File,
+  case seek_files(Name) of
+    {ok,File_name} ->
       Options = [{insertions,Paths},minimal],
       From_xsd = schema_xsd:generate_from_XSD_file(File_name,Options),
       ?log("From_xsd = ~p.~n",[From_xsd]),
       ok = file:write_file("original.xml",codec_xml:encode(From_xsd)),
-      codec_xml:encode( From_xsd, Paths ) end.
+      codec_xml:encode( From_xsd, Paths );
+    Bad -> Bad end.
 
 
+seek_files(In) ->
+  Regexp = lists:flatten([$^,In,$$]),
+  Found =
+    lists:reverse(
+      lists:sort(
+        filelib:fold_files(
+          ".",Regexp,true,fun each_file/2, []) ) ),
+  case Found of
+    [{Base,Dir}|_] -> {ok,filename:join([Dir,Base])};
+    [] -> {not_found,In} end.
+
+each_file(In,Out) ->
+  Dir = filename:dirname(In),
+  Base = filename:basename(In),
+  [{Base,Dir}|Out].
 
 test() ->
   test_1() andalso test_2().
